@@ -16,7 +16,7 @@ def makeLogger(loggerName, logDir):
     dfh.setLevel(logging.DEBUG)
     efh = logging.FileHandler(error_file_name)
     efh.setLevel(logging.ERROR)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s |~| %(processName)s |~| %(name)s |~| %(levelname)s |~| %(message)s')
     efh.setFormatter(formatter)
     dfh.setFormatter(formatter)
     # add the handlers to logger

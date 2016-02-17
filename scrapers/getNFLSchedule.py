@@ -1,5 +1,7 @@
 #date create 2/13/16
 #Populates schedule, and game info collections. Game info will have lot of duplicate data between weather and stadium
+#db.getCollection('nfl_schedule').remove({ 'date': 'Playoffs' }) to remove empty Playoff lines
+#game_info 
 import re
 import csv
 import time
@@ -29,7 +31,7 @@ def parseYear(year):
 
     schedule_list = []
     gameInfo_list = []
-    
+
     client = MongoClient('localhost', 27017)
     db = client['fantasy']
     col_nfl_schedule = db['nfl_schedule']
@@ -120,8 +122,8 @@ def main():
 
     for i in range(maxyear-minyear+1):
         year = minyear + i
-        parseYear(year)
-        #pool.apply_async(parseYear, (year,))
+        #parseYear(year)
+        pool.apply_async(parseYear, (year,))
 
     pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
     pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().

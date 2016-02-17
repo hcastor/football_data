@@ -1,5 +1,6 @@
 import time
 import random
+import csv
 from robobrowser import RoboBrowser
 from datetime import datetime
 
