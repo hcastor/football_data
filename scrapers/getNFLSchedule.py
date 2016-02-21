@@ -15,6 +15,7 @@ from multiprocessing import Pool
 from robobrowserWrapper import open_or_follow_link, get_proxy_count, get_user_agent
 sys.path.append('../')
 from logWrapper import makeLogger, closeLogger
+from utilities import convertToInt
 
 def parseYear(year):
     """
@@ -47,47 +48,55 @@ def parseYear(year):
     time.sleep(wait)
 
     logger.debug('Opening main page')
-    browser = RoboBrowser(history=False,  parser='html5lib', user_agent=get_user_agent(logger), timeout=15)
+    browser = RoboBrowser(history=False,  parser='html5lib', user_agent=get_user_agent(logger), timeout=10)
     browser = open_or_follow_link(logger, browser, 'open', "http://www.pro-football-reference.com/years/{}/games.htm".format(year))
     table = browser.find(id='games')
-    for row in table.find_all('tr'):
+    rows = table.find_all('tr')
+    for index, row in enumerate(rows):
+        logger.debug('Row %d of %d', index, len(rows))
         try:
             schedule_dict = {}
             gameInfo_dict = {}
             columns = row.find_all('td')
             if columns:
-                schedule_dict['week'] = columns[0].text
+                schedule_dict['week'] = convertToInt(columns[0].text)
                 schedule_dict['day'] = columns[1].text
                 schedule_dict['date'] = columns[2].text
-                schedule_dict['year'] = year
+                schedule_dict['year'] = convertToInt(year)
                 homeIndicator = columns[5].text
                 if homeIndicator == '@':
                     schedule_dict['homeTeam'] = columns[6].text
                     schedule_dict['awayTeam'] = columns[4].text
-                    schedule_dict['homeTeamScore'] = columns[8].text
-                    schedule_dict['awayTeamScore'] = columns[7].text
+                    schedule_dict['homeTeamScore'] = convertToInt(columns[8].text)
+                    schedule_dict['awayTeamScore'] = convertToInt(columns[7].text)
                 else:
                     schedule_dict['homeTeam'] = columns[4].text
                     schedule_dict['awayTeam'] = columns[6].text
-                    schedule_dict['homeTeamScore'] = columns[7].text
-                    schedule_dict['awayTeamScore'] = columns[8].text
-                gameInfo_dict['week'] = columns[0].text
-                gameInfo_dict['year'] = year
+                    schedule_dict['homeTeamScore'] = convertToInt(columns[7].text)
+                    schedule_dict['awayTeamScore'] = convertToInt(columns[8].text)
+                gameInfo_dict['week'] = convertToInt(columns[0].text)
+                gameInfo_dict['year'] = convertToInt(year)
                 wait = random.uniform(.5, 2.5)
                 logger.debug('Waiting to follow_link %f', wait)
                 time.sleep(wait)
                 logger.debug('Following link')
                 url = columns[3].find('a')
                 if url:
-                    browser = open_or_follow_link(logger, browser, 'follow_link', url)
-                    game_info = browser.find(id="game_info")
-                    if game_info:
-                        for each in game_info.find_all('tr'):
-                            pair = each.find_all('td')
-                            if pair:
-                                key = pair[0].text
-                                value = pair[1].text
-                                gameInfo_dict[key] = value
+                    gameInfo_tries = 0
+                    game_info = None
+                    while not game_info:
+                        gameInfo_tries += 1
+                        if gameInfo_tries > 1:
+                            logger.debug('game_info tries: %d', gameInfo_tries)
+                        browser = open_or_follow_link(logger, browser, 'follow_link', url)
+                        game_info = browser.find(id="game_info")
+                        if game_info:
+                            for each in game_info.find_all('tr'):
+                                pair = each.find_all('td')
+                                if pair:
+                                    key = pair[0].text
+                                    value = convertToInt(pair[1].text)
+                                    gameInfo_dict[key] = value
 
                 schedule_list.append(schedule_dict)
                 gameInfo_list.append(gameInfo_dict)
@@ -101,6 +110,8 @@ def parseYear(year):
     logger.debug('mapping nfl_schedule.id to gameInfo_list')
 
     for index, schedule_id in enumerate(schedule_ids):
+        if len(gameInfo_list[index].keys()) <= 2:
+            logger.debug('Empty game_info: %s', schedule_id)
         gameInfo_list[index]['schedule_id'] = schedule_id
 
     logger.debug('game_info.insert_many')
@@ -118,7 +129,7 @@ def main():
     minyear = 1960
     maxyear = 2015
 
-    pool = Pool(processes=get_proxy_count()/2)
+    pool = Pool(processes=int(get_proxy_count()/2.5))
 
     for i in range(maxyear-minyear+1):
         year = minyear + i

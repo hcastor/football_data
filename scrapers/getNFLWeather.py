@@ -1,8 +1,16 @@
 #date create 2/13/16
+import sys
 import re
 import csv
+import random
+import time
 from robobrowser import RoboBrowser
+from pymongo import MongoClient
 from datetime import datetime, timedelta
+
+from robobrowserWrapper import open_or_follow_link, get_proxy_count, get_user_agent
+sys.path.append('../')
+from logWrapper import makeLogger, closeLogger
 
 def parseWeek(year, week):
     logger = makeLogger(year, r'./logs_nflWeather/')
@@ -16,6 +24,7 @@ def parseWeek(year, week):
 
     client = MongoClient('localhost', 27017)
     db = client['fantasy']
+    col_nfl_schedule = db['nfl_schedule']
     col_weather_info = db['weather_info']
     col_stadium_info = db['stadium_info']
 
@@ -41,8 +50,6 @@ def parseWeek(year, week):
 
         columns = row.find_all('td')
         if columns:
-            awayTeam = columns[1].find('a').text
-            homeTeam = columns[5].find('a').text
             weatherInfo['weatherPicAlt'] = columns[8].find('img')['alt']
             weatherInfo['weatherText'] = columns[9].text.strip()
             weatherInfo['shortWind'] = columns[10].text
@@ -50,6 +57,8 @@ def parseWeek(year, week):
             detialsLink = 'http://nflweather.com' + details.find('a')['href']
             browser = open_or_follow_link(logger, browser, 'open', detialsLink)
             gameTime = browser.find('strong').text.split('-')[0].split(':', 1)[1].strip()
+            awayTeam = browser.find_all(class_='g-away')[1].find('a').text
+            homeTeam = browser.find_all(class_='g-home')[1].find('a').text
             spans = browser.find_all(class_='span5')
             if len(spans) != 2:
                 raise('to many spans')
@@ -73,15 +82,16 @@ def parseWeek(year, week):
                     weatherInfo['split[0].strip()'] = split[1].strip()
 
             #find nfl_schedule, update gameTime, hoepfully result as id, insert id into both info dicts, append to _list
+            print col_nfl_schedule.find({'year': year, 'week': str(week), 'homeTeam': homeTeam, 'awayTeam': awayTeam}).count()
     #bulk create
-    #close logger
+
 
 def main():
 
     startTime = datetime.now()
     print startTime
 
-    pool = Pool(processes=get_proxy_count()/2)
+   #pool = Pool(processes=get_proxy_count()/2)
 
     #pages = [(2009, 17), (2010, 17), (2011, 17), (2012, 17), (2013, 17), (2014, 17), (2015, 17)]
     pages = [(2015, 17)]
@@ -91,9 +101,12 @@ def main():
         for week in range(1, maxWeek+1):
             parseWeek(year, week)
             #pool.apply_async(parseWeek, (year, week,))
+    
+    # for year, _ in pages:
+    #     closeLogger(year)
 
-    pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
-    pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
+    #pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
+    #pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
 
     print datetime.now()-startTime 
 

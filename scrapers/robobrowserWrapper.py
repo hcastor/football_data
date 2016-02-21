@@ -23,11 +23,12 @@ def open_or_follow_link(logger, browser, action, url):
                 browser.follow_link(url, proxies={'http': get_proxy(logger)})
         except:
             logger.debug(action + ', tries: ' + str(tries))
-            if tries < 20:
-                continue
-            else:
-                logger.exception(action + ', tries: ' + str(tries))
+            if tries == 1:
+                logger.debug('response')
+            elif tries > 20:
+                logger.exception('response')
                 time.sleep(300)
+            continue
         logger.debug('open_or_follow_link time elapsed: ' + str(datetime.now() - startTime))
         return browser
 
