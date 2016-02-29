@@ -37,6 +37,7 @@ def parseYear(year):
     db = client['fantasy']
     col_nfl_schedule = db['nfl_schedule']
     col_game_info = db['game_info']
+    col_failed_game_info = db['failed_game_info']
 
     if col_nfl_schedule.find({'year': year}).count():
         logger.debug('Already parsed %s', year)
@@ -82,21 +83,24 @@ def parseYear(year):
                 logger.debug('Following link')
                 url = columns[3].find('a')
                 if url:
-                    gameInfo_tries = 0
-                    game_info = None
-                    while not game_info:
-                        gameInfo_tries += 1
-                        if gameInfo_tries > 1:
-                            logger.debug('game_info tries: %d', gameInfo_tries)
-                        browser = open_or_follow_link(logger, browser, 'follow_link', url)
-                        game_info = browser.find(id="game_info")
-                        if game_info:
-                            for each in game_info.find_all('tr'):
-                                pair = each.find_all('td')
-                                if pair:
-                                    key = pair[0].text
-                                    value = convertToInt(pair[1].text)
-                                    gameInfo_dict[key] = value
+                    url = 'http://www.pro-football-reference.com' + url['href']
+                    failed_game_info = True
+                    browser = open_or_follow_link(logger, browser, 'open', url)
+                    game_info = browser.find(id="game_info")
+                    if game_info:
+                        for each in game_info.find_all('tr'):
+                            pair = each.find_all('td')
+                            if pair:
+                                failed_game_info = False
+                                key = pair[0].text
+                                value = convertToInt(pair[1].text)
+                                gameInfo_dict[key] = value
+                    if failed_game_info:
+                        failed_dict = schedule_dict
+                        failed_dict['row'] = index
+                        failed_dict['href'] = url['href']
+                        col_failed_game_info.insert(failed_dict)
+                        gameInfo_dict['FAIL'] = True
 
                 schedule_list.append(schedule_dict)
                 gameInfo_list.append(gameInfo_dict)
@@ -129,7 +133,7 @@ def main():
     minyear = 1960
     maxyear = 2015
 
-    pool = Pool(processes=int(get_proxy_count()/2.5))
+    pool = Pool(processes=int(get_proxy_count()/2))
 
     for i in range(maxyear-minyear+1):
         year = minyear + i
