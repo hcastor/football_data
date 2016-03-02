@@ -47,8 +47,8 @@ def parseWeek(year, week):
 
     for index, row in enumerate(rows):
         logger.debug('Row %d of %d', index, len(rows))
-        weatherInfo = {}
-        stadiumInfo = {}
+        weatherInfo = {'year': year, 'week': week}
+        stadiumInfo = {'year': year, 'week': week}
 
         try:
             columns = row.find_all('td')
@@ -68,7 +68,7 @@ def parseWeek(year, week):
                 homeTeam = browser.find_all(class_='g-home')[1].find('a').text.replace('  ', ' ').strip()
                 spans = browser.find_all(class_='span5')
                 if len(spans) != 2:
-                    raise('to many spans')
+                    raise Exception('to many spans')
 
                 weatherItems = spans[0].find_all('p')
                 stadiumItems = spans[1].find_all('p')
@@ -85,7 +85,7 @@ def parseWeek(year, week):
                     split = each.text.strip().split(':')
                     if len(split) == 2:
                         if split[0] == 'Surface':
-                            weatherInfo['stadium'] = stadiumItems[index-1].text.strip()
+                            stadiumInfo['stadium'] = stadiumItems[index-1].text.strip()
                         stadiumInfo[split[0].strip()] = convertToInt(split[1].strip())
 
                 #find nfl_schedule, update gameTime, hoepfully result as id, insert id into both info dicts, append to _list
