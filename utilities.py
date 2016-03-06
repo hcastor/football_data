@@ -4,3 +4,17 @@ def convertToInt(value):
     except ValueError:
         pass
     return value
+
+def convertToNumber(value):
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    try:
+        return float(value)
+    except ValueError:
+        pass
+    return value
+
+def cleanKey(value):
+    return value.replace('.', '').replace('$', '')
