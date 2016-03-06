@@ -32,16 +32,29 @@ def main():
     pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
 
     proxySet = set()
-    with open('proxy_list_http_new.csv', 'wb') as csvfile:
+    duplicates = 0
+    failed = 0
+    success = 0
+    with open('proxy_list_http.csv', 'wb') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=['Last Update','IP Address','Port','Country','Speed','Connection Time','Type','Anon'])
         writer.writeheader()
         for result in results:
             value = result.get()
             if value:
+                success += 1
                 proxy = value['IP Address'] + ' ' + value['Port']
                 if proxy not in proxySet:
                     writer.writerow(value)
                     proxySet.add(proxy)
+                else:
+                    duplicates += 1
+            else:
+                failed += 1
+
+    print 'success:', success
+    print 'failed:', failed
+    print 'duplicates:', duplicates
+    print 'total:', success - duplicates
 
 if __name__ == '__main__':
     main()
