@@ -28,7 +28,7 @@ def open_or_follow_link(logger, browser, action, url):
             logger.debug(action + ', tries: ' + str(tries))
             if tries > 20:
                 tries = 0.1
-                logger.exception('20 tries in a row, waiting 5 minutes')
+                logger.debug('20 tries in a row, waiting 5 minutes')
                 time.sleep(300)
             else:
                 time.sleep(random.uniform(.5, 2.5))
