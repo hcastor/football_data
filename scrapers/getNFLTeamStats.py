@@ -23,6 +23,12 @@ def removeNewLine(value):
     return re.sub('[\t,\n,\r]', '', value)
 
 def parseSeason(role, category, season, seasonTypes):
+    """Parses every seasonType in a season at http://www.nfl.com/stats/categorystats for a given role/category/season
+    doesnt follow any links
+    some years dont have any info, but still return a page.
+    These are loged with Exception('No teams found %s' % url)
+    All data is stored in nfl_team_stats
+    """
     logger = makeLogger(role.text + '_' + category.text + '_' + season.text, r'./logs_nflteamStat/')
 
     startTime = datetime.now()
@@ -130,6 +136,11 @@ def parseSeason(role, category, season, seasonTypes):
     closeLogger(role.text + '_' + category.text)
 
 def main():
+    """Starts the scrapping proccess.
+    Opens a teamstats page and gathers all the form inputs
+    Then sends these inputs to parseSeason which opens a new page for every possible option in the form
+    If you get an error at the start, with role.find_all, just try again, nfl.com returns weird pages sometimes
+    """
 
     logger = makeLogger('main', r'./logs_nflteamStat/')
 

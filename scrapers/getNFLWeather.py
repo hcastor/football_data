@@ -20,6 +20,10 @@ col_weather_info = db['weather_info']
 col_stadium_info = db['stadium_info']
 
 def parseWeek(year, week):
+    """Parsing a specific week at http://nflweather.com/week/{}/Week-{}
+    Follows all detial links, which is where must of the data is scraped.
+    Scrapes weather, and stadium enough per week, and stores them in their respective collections
+    """
     logger = makeLogger(str(year) + '_' + str(week), r'./logs_nflWeather/')
 
     startTime = datetime.now()
@@ -120,8 +124,9 @@ def main():
 
     pool = Pool(processes=int(get_proxy_count()/2.5))
 
+    #nflweather.com goes back to 2009, 2010 seems to be missing.
     pages = [(2009, 17), (2010, 17), (2011, 17), (2012, 17), (2013, 17), (2014, 17), (2015, 17)]
-    #pages = [(2015, 17)]
+
     headers = []
     dataList = []
     for year, maxWeek in pages:
