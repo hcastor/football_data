@@ -1,24 +1,149 @@
 #Date created 11/3/15
+import sys
 import re
-import csv
+import random
+import time
 import json
 from collections import defaultdict
 from robobrowser import RoboBrowser
-from datetime import datetime, timedelta
+from pymongo import MongoClient
+from datetime import datetime
+from multiprocessing import Pool
+
+from robobrowserWrapper import open_or_follow_link, get_proxy_count, get_user_agent
+sys.path.append('../')
+from logWrapper import makeLogger, closeLogger
+from utilities import convertToNumber, cleanKey
+
+client = MongoClient('localhost', 27017)
+db = client['fantasy']
+col_nfl_team_stats = db['nfl_team_stats']
+
+def removeNewLine(value):
+    return re.sub('[\t,\n,\r]', '', value)
+
+def parseCategory(role, category, seasons, seasonTypes):
+    logger = makeLogger(role.text + '_' + category.text, r'./logs_nflteamStat/')
+
+    startTime = datetime.now()
+
+    logger.debug('Starting %s %s', role.text, category.text)
+
+    teamStat_list = []
+    for season in seasons:
+        if season.text == "Season..." or convertToNumber(removeNewLine(season.text)) < 1960:
+            continue
+        for seasonType in seasonTypes:
+            if seasonType.text == "Season Type...":
+                continue
+
+            team_stats_query = {'year': convertToNumber(removeNewLine(season.text)),
+                'seasonType': removeNewLine(seasonType.text),
+                'role': removeNewLine(role.text),
+                'category': removeNewLine(category.text)
+            }
+
+            if col_nfl_team_stats.find(team_stats_query).count():
+                logger.debug('Already parsed %s %s', role.text, category.text)
+                return None
+
+            wait = random.uniform(1.5,3.5)
+            logger.debug('Waiting %f', wait)
+            time.sleep(wait)
+
+            logger.debug('Starting: %s', team_stats_query)
+            url = 'http://www.nfl.com/stats/categorystats?' + 'archive=true&conference=null' + '&role=' + role['value']
+            if role.text == "Offense":
+                categoryUrl = '&offensiveStatisticCategory=' + category['value'] + '&defensiveStatisticCategory=null'
+                
+            elif role.text == "Defense":
+                categoryUrl = '&offensiveStatisticCategory=null&defensiveStatisticCategory=' + category['value']
+            else:
+                raise Exception('Unsupported role: %s', role.text)
+            
+            url += categoryUrl
+            url += '&season=' + season['value'] + '&seasonType=' + seasonType['value'] + '&tabSeq=2&qualified=false&Submit=Go'
+
+            logger.debug('Opening: %s', url)
+            browser = RoboBrowser(history=False,  parser='html5lib', user_agent=get_user_agent(logger), timeout=10)
+            result = None
+            tries = 0
+            while(not result):
+                tries += 1
+                logger.debug('tries: %d', tries)
+                browser = open_or_follow_link(logger, browser, 'open', url)
+                result = browser.find(id="result")
+                if tries > 10:
+                    raise exception('10 tries in a row %s failed', url)
+                else:
+                    time.sleep(random.uniform(.5, 2.5))
+
+
+            try:
+                tbodies = result.find_all("tbody")
+                if len(tbodies) != 2:
+                    raise Exception("error parsing result")
+                tableKey = tbodies[0]
+                tableKey = tableKey.find_all("th")
+
+                tableItems = tbodies[1]
+                tableItems = tableItems.find_all("td")
+
+                tableColumn = 0
+                teamStatDict = {}
+                for tableIndex, tableItem in enumerate(tableItems):
+                    if tableColumn == 0:
+                        logger.debug('Row %d of %d', tableIndex, len(tableItems))
+                        tableColumn += 1
+                        continue
+
+                    if tableColumn == 1:
+                        teamStatDict['team'] = removeNewLine(tableItem.text)
+                        teamStatDict['year'] = convertToNumber(removeNewLine(season.text))
+                        teamStatDict['seasonType'] = removeNewLine(seasonType.text)
+                        teamStatDict['role'] = removeNewLine(role.text)
+                        teamStatDict['category'] = removeNewLine(category.text)
+                        tableColumn += 1
+                        continue
+
+                    key = cleanKey(removeNewLine(tableKey[tableColumn].text))
+                    value = convertToNumber(removeNewLine(tableItem.text))
+                    teamStatDict[key] = value
+
+                    tableColumn += 1
+                    if tableColumn >= len(tableKey):
+                        teamStat_list.append(teamStatDict)
+                        teamStatDict = {}
+                        tableColumn = 0
+            except:
+                logger.exception('row fail: tableColumn: %d tableKeyLen: %d tableItemLen: %d', tableColumn, len(tableKey), len(tableItems))
+
+    try:
+        logger.debug('Bulk Creating teamStat_list')
+        col_nfl_team_stats.insert_many(teamStat_list)
+    except:
+        logger.exception('insert_many error')
+
+    logger.debug('parseCategory time elapsed: ' + str(datetime.now() - startTime))
+
+    closeLogger(role.text + '_' + category.text)
 
 def main():
 
+    logger = makeLogger('main', r'./logs_nflteamStat/')
+
     startTime = datetime.now()
-    print startTime
+    logger.debug('Starting')
+
+    pool = Pool(processes=int(get_proxy_count()/2.5))
 
     #html5lib parser required for broken html on gameSplits
-    browser = RoboBrowser(history=False, parser='html5lib')
+    browser = RoboBrowser(history=False,  parser='html5lib', user_agent=get_user_agent(logger), timeout=10)
+    startingUrl = "http://www.nfl.com/stats/categorystats?tabSeq=2&offensiveStatisticCategory=GAME_STATS&conference=ALL&role=TM&season=2015&seasonType=REG"
+    browser = open_or_follow_link(logger, browser, 'open', startingUrl)
 
-    browser.open("http://www.nfl.com/stats/categorystats?tabSeq=2&offensiveStatisticCategory=GAME_STATS&conference=ALL&role=TM&season=2015&seasonType=REG&d-447263-s=TOTAL_YARDS_GAME_AVG&d-447263-o=2&d-447263-n=1")
-
-    #get form and form options
-    form = browser.get_form(action="/stats/categorystats")
     role = browser.find(id="role")
+    
     roles = role.find_all("option")
     offensiveCategory = browser.find(id="offensive-category")
     offensiveCategories = offensiveCategory.find_all("option")
@@ -29,9 +154,8 @@ def main():
     seasonType = browser.find(id="season-type")
     seasonTypes = seasonType.find_all("option")
 
-    teamStatDict = defaultdict(dict)
+    
     for role in roles:
-        print role['value']
         availableCategories = None
         if role.text == "Offense":
             availableCategories = offensiveCategories
@@ -43,58 +167,14 @@ def main():
         for category in availableCategories:
             if category.text == "Category...":
                 continue
-            print category['value']
-            for season in seasons:
-                if season.text == "Season...":
-                    continue
-                print season['value']
-                for seasonType in seasonTypes:
-                    if seasonType.text == "Season Type...":
-                        continue
-                    print seasonType['value']
-                    form["role"].value = role['value']
-                    if role.text == "Offense":
-                        form['offensiveStatisticCategory'].value = category['value']
-                    elif role.text == "Defense":
-                        form['defensiveStatisticCategory'].value = category['value']
-                    form['season'].value = season['value']
-                    form['seasonType'].value = seasonType['value']
-                    browser.submit_form(form)
-                    result = browser.find(id="result")
-                    if result:
-                        tbodies = result.find_all("tbody")
-                        if len(tbodies) != 2:
-                            print "error parsing result"
-                        tableKey = tbodies[0]
-                        tableKey = tableKey.find_all("th")
+            parseCategory(role, category, seasons, seasonTypes)
+            #pool.apply_async(parseCategory, (role, category, seasons, seasonTypes,))
 
-                        tableItems = tbodies[1]
-                        tableItems = tableItems.find_all("td")
+    pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
+    pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
 
-                        team = None
-                        tableColumn = 0
-                        for tableItem in tableItems:
-                            if tableColumn == 0:
-                                tableColumn += 1
-                                continue
-
-                            if tableColumn == 1:
-                                team = tableItem.text
-                                tableColumn += 1
-                                continue
-
-                            teamStatHashTuple = (re.sub('[\t,\n,\r]', '', team), re.sub('[\t,\n,\r]', '', season.text), re.sub('[\t,\n,\r]', '', seasonType.text), re.sub('[\t,\n,\r]', '', role.text))
-                            teamStatDict[teamStatHashTuple][re.sub('[\t,\n,\r]', '', tableKey[tableColumn].text)] = re.sub('[\t,\n,\r]', '', tableItem.text)
-
-                            tableColumn += 1
-                            if tableColumn >= len(tableKey):
-                                tableColumn = 0
-                    print teamStatDict
-                    raw_input('-->')
-    for keyTuple, categories in teamStatDict.iteritems():
-        print keyTuple
-        print categories
-    print datetime.now()-startTime 
+    print datetime.now()-startTime
+    logger.debug('main time elapsed: ' + str(datetime.now() - startTime))
 
 if __name__ == '__main__':
     main()
