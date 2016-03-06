@@ -1,3 +1,4 @@
+#Date created 2/16/16
 import os
 import logging
 from datetime import datetime
