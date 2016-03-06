@@ -1,7 +1,6 @@
 #date create 2/13/16
 import sys
 import re
-import csv
 import random
 import time
 from robobrowser import RoboBrowser
@@ -12,7 +11,13 @@ from multiprocessing import Pool
 from robobrowserWrapper import open_or_follow_link, get_proxy_count, get_user_agent
 sys.path.append('../')
 from logWrapper import makeLogger, closeLogger
-from utilities import convertToInt
+from utilities import convertToInt, cleanKey
+
+client = MongoClient('localhost', 27017)
+db = client['fantasy']
+col_nfl_schedule = db['nfl_schedule']
+col_weather_info = db['weather_info']
+col_stadium_info = db['stadium_info']
 
 def parseWeek(year, week):
     logger = makeLogger(str(year) + '_' + str(week), r'./logs_nflWeather/')
@@ -23,12 +28,6 @@ def parseWeek(year, week):
 
     weather_list = []
     stadium_list = []
-
-    client = MongoClient('localhost', 27017)
-    db = client['fantasy']
-    col_nfl_schedule = db['nfl_schedule']
-    col_weather_info = db['weather_info']
-    col_stadium_info = db['stadium_info']
 
     if col_weather_info.find({'year': year, 'week': week}).count():
         logger.debug('Already parsed %d %d', year, week)
@@ -79,14 +78,14 @@ def parseWeek(year, week):
                 for each in weatherItems:
                     split = each.text.strip().split(':')
                     if len(split) == 2:
-                        weatherInfo[split[0].strip()] = convertToInt(split[1].strip())
+                        weatherInfo[cleanKey(split[0].strip())] = convertToInt(split[1].strip())
                 
                 for index, each in enumerate(stadiumItems):
                     split = each.text.strip().split(':')
                     if len(split) == 2:
                         if split[0] == 'Surface':
                             stadiumInfo['stadium'] = stadiumItems[index-1].text.strip()
-                        stadiumInfo[split[0].strip()] = convertToInt(split[1].strip())
+                        stadiumInfo[cleanKey(split[0].strip())] = convertToInt(split[1].strip())
 
                 #find nfl_schedule, update gameTime, hoepfully result as id, insert id into both info dicts, append to _list
                 nfl_schedule_query = {'year': year, 'week': week, 'homeTeam': homeTeam, 'awayTeam': awayTeam}
@@ -103,11 +102,13 @@ def parseWeek(year, week):
         except:
             logger.exception(row)
 
-    logger.debug('Bulk Creating weather_list')
-    col_weather_info.insert_many(weather_list)
-    logger.debug('Bulk Creating stadium_list')
-    col_stadium_info.insert_many(stadium_list)
-
+    try:
+        logger.debug('Bulk Creating weather_list')
+        col_weather_info.insert_many(weather_list)
+        logger.debug('Bulk Creating stadium_list')
+        col_stadium_info.insert_many(stadium_list)
+    except:
+        logger.exception('insert_many error')
     logger.debug('parseWeek time elapsed: ' + str(datetime.now() - startTime))
 
     closeLogger(str(year) + '_' + str(week))
