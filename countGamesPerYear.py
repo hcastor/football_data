@@ -10,21 +10,7 @@ col_failed_game_info = db['failed_game_info']
 col_weather_info = db['weather_info']
 col_stadium_info = db['stadium_info']
 col_nfl_team_stats = db['nfl_team_stats']
-
-previous_year = None
-for each in col_nfl_team_stats.aggregate([
-        { "$group":{ '_id':{'year': '$year', 'role': '$role', 'category': '$category', 'seasonType': '$seasonType'}, 'count': {"$sum": 1}}},
-        {'$sort':{'_id.year':1, '_id.role':-1}},
-
-    ]):
-    year = each['_id']['year']
-    if previous_year != year:
-        print '-'*30
-        print 'year:', year
-    #Count should be equal per year through categories
-    print each['_id']['role'], each['_id']['category'], 'Count:', each['count']
-    previous_year = year
-
+col_fanduel_prices = db['fanduel_prices']
 
 weatherCounter = Counter()
 for each in col_weather_info.find():
@@ -49,3 +35,22 @@ for i in range(maxyear-minyear+1):
     print 'weatherCount:', weatherCounter.get(year)
     print 'stadiumCount:', stadiumCounter.get(year)
 
+previous_year = None
+for each in col_nfl_team_stats.aggregate([
+        { "$group":{ '_id':{'year': '$year', 'role': '$role', 'category': '$category'}, 'count': {"$sum": 1}}},
+        {'$sort':{'_id.year':1, '_id.role':-1}},
+
+    ]):
+    year = each['_id']['year']
+    if previous_year != year:
+        print '-'*30
+        print 'year:', year
+    #Count should be equal per year through categories
+    print each['_id']['role'], each['_id']['category'], 'Count:', each['count']
+    previous_year = year
+
+for each in col_fanduel_prices.aggregate([
+        {"$group":{ '_id': {'Year': '$Year', 'Week': '$Week'}, 'count': {"$sum": 1}}},
+        {'$sort':{ '_id.Week':-1, '_id.Year':-1}},
+        ]):
+    print each
