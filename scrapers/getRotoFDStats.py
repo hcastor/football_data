@@ -28,7 +28,7 @@ def parseWeek(year, week):
     db = client['fantasy']
     col_fanduel_prices = db['fanduel_prices']
 
-    if col_fanduel_prices.find({'year': year, 'week': week}).count():
+    if col_fanduel_prices.find({'year': year, 'yeek': week}).count():
         logger.debug('Already parsed %d %d', year, week)
         closeLogger(logger)
         return None
