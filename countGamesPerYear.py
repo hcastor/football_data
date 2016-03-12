@@ -50,7 +50,7 @@ for each in col_nfl_team_stats.aggregate([
     previous_year = year
 
 for each in col_fanduel_prices.aggregate([
-        {"$group":{ '_id': {'Year': '$Year', 'Week': '$Week'}, 'count': {"$sum": 1}}},
-        {'$sort':{ '_id.Week':-1, '_id.Year':-1}},
+        {"$group":{ '_id': {'year': '$year', 'week': '$week'}, 'count': {"$sum": 1}}},
+        {'$sort':{ '_id.week':-1, '_id.year':-1}},
         ]):
     print each
