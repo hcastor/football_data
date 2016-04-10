@@ -197,8 +197,8 @@ def main():
             for season in seasons:
                 if season.text == "Season..." or convertToNumber(removeNewLine(season.text)) < 1960:
                     continue
-                parseSeason(role, category, season, seasonTypes)
-                #pool.apply_async(parseSeason, (role, category, season, seasonTypes,))
+                #parseSeason(role, category, season, seasonTypes)
+                pool.apply_async(parseSeason, (role, category, season, seasonTypes,))
 
     pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
     pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
