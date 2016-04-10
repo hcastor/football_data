@@ -22,9 +22,6 @@ col_nfl_team_stats = db['nfl_team_stats']
 def removeNewLine(value):
     return re.sub('[\t,\n,\r]', '', value)
 
-#field goals, punt returns, scoring, offensive line
-#sacks, scoring, tackles, interceptions
-
 def parseSeason(role, category, season, seasonTypes):
     """Parses every seasonType in a season at http://www.nfl.com/stats/categorystats for a given role/category/season
     doesnt follow any links
@@ -40,7 +37,7 @@ def parseSeason(role, category, season, seasonTypes):
 
     teamStat_list = []
     for seasonType in seasonTypes:
-        if seasonType.text == "Season Type..." or convertToNumber(removeNewLine(season.text)) != 2015:
+        if seasonType.text == "Season Type...":
             continue
 
         team_stats_query = {'year': convertToNumber(removeNewLine(season.text)),
@@ -196,8 +193,7 @@ def main():
         for category in availableCategories:
             if category.text == "Category...":
                 continue
-            if category.text != 'Field Goals':
-                continue
+
             for season in seasons:
                 if season.text == "Season..." or convertToNumber(removeNewLine(season.text)) < 1960:
                     continue
