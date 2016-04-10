@@ -6,6 +6,28 @@ from collections import defaultdict
 from robobrowser import RoboBrowser
 from datetime import datetime, timedelta
 
+#connect each player colection to nfl_team_stats, fanduel_prices, nfl_schedule
+
+def getPlayerTabUrl(playerUrl, tabName):
+    return ''.join(playerUrl.rsplit('/', 1)[:-1]) + '/' + tabName
+
+def parsePlayerBio(playerBio):
+    playerBioDict = {}
+    for lineNumber, line in enumerate(playerBio.find_all('p')):
+        if lineNumber == 0:
+            firstName, lastName = line.find(class_="player-name").text.strip().split(' ')
+            playerBioDict['firstName'] = firstName
+            playerBioDict['lastName'] = lastName
+            playerNumber, position = line.find(class_="player-number").text.strip().split(' ')
+            playerBioDict['playerNumber'] = playerNumber[1:]
+            playerBioDict['position'] = position
+        elif lineNumber == 1:
+            continue
+        else:
+            playerBioDict.update({keyValue[0].strip(): keyValue[1].strip() for keyValue in re.findall('(.*): ?(.*)', line.text)})
+
+    print playerBioDict
+
 def parseCareerStats(careerStats):
     print len(careerStats)
 
@@ -50,13 +72,10 @@ def parseCareerStats(careerStats):
 def parseGameLogs(gameLogs):
     print len(gameLogs)
 
-
     gameLogsDict = {} # {category: {week: {stats}, ...}, ...}
     #messy because of bye weeks, 1 less column present
     for gameLog in gameLogs:
         tableName = gameLog.find(class_="player-table-header").find('td').text.strip()
-        if tableName == 'Preseason':
-            continue
         print tableName
 
         tableKey = gameLog.find(class_="player-table-key")
@@ -141,7 +160,7 @@ def parseGameLogs(gameLogs):
                     tableColumn = 0
                     byeWeek = False
         gameLogsDict[tableName] = tableDict
-            
+
     with open(r'gameLogs.txt', 'w') as oF:
         oF.write(json.dumps(gameLogsDict))
 
@@ -198,6 +217,28 @@ def parseGameSplits(gameSplits):
                 for tableKey, tableValue in tableValues.iteritems():
                     print tableKey, tableValue
 
+def parseDraft(draft):
+    draftStatDict = {}
+    draftStatDict['draftYear'] = draft.find(class_='draft-header').text.split(' ')[1]
+    draftStatDict['pickNumber'] = draft.find(class_='pick-number').text
+    draftStatDict['team'] = draft.find(class_='team').text
+    draftStatDict['round'] = draft.find(class_='round').text
+    draftStatDict['draftAnalysis'] = draft.find(class_='draft-analysis').find('p').text.encode('utf-8')
+
+    print draftStatDict
+
+
+def parseCombine(combine):
+    combineStatDict = {}
+    combineStatDict['combineYear'] = combine.find(class_='combine-header').text.split(' ')[1]
+    combineStats = combine.find(id='combine-stats')
+    for title in combineStats.find_all(class_='tp-title'):
+        value = title.find(class_='tp-results').text
+        key = title.text.replace(value, '')
+        combineStatDict[key] = value
+    print combineStatDict
+
+
 def main():
 
     startTime = datetime.now()
@@ -206,111 +247,165 @@ def main():
     #html5lib parser required for broken html on gameSplits
     browser = RoboBrowser(history=False, parser='html5lib')
 
-    browser.open("http://search.nfl.com/search?query=tom+brady")
+    browser.open('http://www.nfl.com/stats/categorystats?tabSeq=0&statisticCategory=PASSING&qualified=true&season=2015&seasonType=PRE')
 
-    spotLight = browser.find(class_="ez-spotlights")
+    statisticCategory = browser.find(id="statistic-category")
+    statisticCategories = statisticCategory.find_all("option")
+    season = browser.find(id="season-dropdown")
+    seasons = season.find_all("option")
+    seasonType = browser.find(id="season-type")
+    seasonTypes = seasonType.find_all("option")
 
-    #collect links
-    careerStats = spotLight.select(".stats")
-    gameLogs = spotLight.select(".logs")
-    gameSplits = spotLight.select(".splits")
-    sitStats = spotLight.select(".sitstats")
-    
-    #parse careerStats
-    browser.follow_link(careerStats[0])
-    careerStats = browser.find(id="player-stats-wrapper")
-    careerStats = careerStats.find_all("table")
-    parseCareerStats(careerStats)
+    for statisticCategory in statisticCategories:
+        if statisticCategory.text == 'Category...':
+            continue
+        for season in seasons:
+            if season.text == 'Season...':
+                continue
+            for seasonType in seasonTypes:
+                if seasonType.text == 'Season Type...':
+                    continue
 
-    raw_input('careerStats-->')
+                loadNextPage = True
+                pageNumber = 1
+                while(loadNextPage):
 
-    #parse gameLogs
-    browser.follow_link(gameLogs[0])
-    gameLogYears = browser.find(id="criteria")
-    gameLogYears = gameLogYears.find_all("option")
-    gameLogYearList = []
-    for gameLogYear in gameLogYears:
-        gameLogYearList.append(gameLogYear.text.strip())
+                    browser.open('http://www.nfl.com/stats/categorystats?tabSeq=0&statisticCategory=' + statisticCategory['value'] + '&qualified=true&season=' + season['value'] + '&seasonType=' + seasonType['value'] + '&d-447263-p=' + str(pageNumber))
+                    pageNumber += 1
+                    linkNavigation = browser.find(class_='linkNavigation')
+                    if not linkNavigation or pageNumber > len(linkNavigation.find_all('a')):
+                        loadNextPage = False
 
-    for gameLogYear in gameLogYearList:
-        season = browser.get_form(id="criteria")
-        season['season'].value = gameLogYear
-        browser.submit_form(season)
-        gameLogs = browser.find(id="player-stats-wrapper")
-        gameLogs = gameLogs.find_all("table")
-        parseGameLogs(gameLogs)
-        
-    raw_input('gameLogs-->')
+                    result = browser.find(id="result")
 
-    #parse game splits
-    browser.follow_link(gameSplits[0])
-    years = browser.find(id="criteria")
-    years = years.find_all("option")
-    yearsList = []
-    for year in years:
-        yearsList.append(year.text.strip())
-    
-    
+                    tries = 0
+                    # sometimes when using slow proxies nfl.com returns 200 without the whole page being loaded
+                    while not result:
+                        if tries > 10:
+                            raise Exception('No teams found %s' % url)
+                        elif tries > 0:
+                            time.sleep(random.uniform(5, 7))
+                        tries += 1
+                        logger.debug('No result-tries: %d', tries)
+                        browser = RoboBrowser(history=False,  parser='html5lib', user_agent=get_user_agent(logger), timeout=10)
+                        browser = open_or_follow_link(logger, browser, 'open', url)
+                        result = browser.find(id="result")
 
-    for year in yearsList:
-        season = browser.get_form(id="criteria")
-        season['season'].value = year
-        browser.submit_form(season)
+                    tbodies = result.find_all("tbody")
+                    if len(tbodies) != 2:
+                        raise Exception("error parsing result")
+                    tableKey = tbodies[0]
+                    tableKey = tableKey.find_all("th")
 
-        gameSplits = browser.find(id="player-stats-wrapper")
+                    tableItems = tbodies[1]
+                    tableItems = tableItems.find_all("td")
 
-        parseGameSplits(gameSplits)
-    
-    raw_input('splits-->')
+                    tableColumn = 0
+                    teamStatDict = {}
+                    for tableIndex, tableItem in enumerate(tableItems):
+                        if tableColumn == 0:
+                            #logger.debug('Row %d of %d', tableIndex, len(tableItems))
+                            tableColumn += 1
+                            continue
 
-    #parse situational stats
-    browser.follow_link(sitStats[0])
-    years = browser.find(id="criteria")
-    years = years.find_all("option")
-    yearsList = []
-    for year in years:
-        yearsList.append(year.text.strip())
-    
-    
+                        if tableColumn == 1:
+                            playerUrl = 'http://www.nfl.com' + tableItem.find('a')['href']
+                            browser.open(playerUrl)
+                            
+                            #parsePlayer BIO
+                            playerBio = browser.find(class_="player-info")
+                            parsePlayerBio(playerBio)
+                            raw_input('playerBio-->')
 
-    for year in yearsList:
-        season = browser.get_form(id="criteria")
-        season['season'].value = year
-        browser.submit_form(season)
+                            playerUrl = browser.url
+                            tabNames = [tabName['href'] for tabName in browser.find(id="player-profile-tabs").find_all('a')]
+                            for tabName in tabNames:
+                                playerUrl = getPlayerTabUrl(playerUrl, tabName)
 
-        situationalStats = browser.find(id="player-stats-wrapper")
+                                if tabName == 'profile':
+                                    continue
 
-        parseGameSplits(situationalStats)
+                                print playerUrl
+                                browser.open(playerUrl)
 
-    raw_input('situational-->')
+                                if tabName == 'careerstats':
+                                    careerStats = browser.find(id="player-stats-wrapper")
+                                    careerStats = careerStats.find_all("table")
+                                    parseCareerStats(careerStats)
 
-    # gameSplits = gameSplits.find_all("table")
-    # print gameSplits
+                                    raw_input('careerStats-->')
+                                elif tabName == 'gamelogs':
+                                    #parse gameLogs
+                                    gameLogYears = browser.find(id="criteria")
+                                    gameLogYears = gameLogYears.find_all("option")
+                                    gameLogYearList = []
+                                    for gameLogYear in gameLogYears:
+                                        gameLogYearList.append(gameLogYear.text.strip())
 
-    #correlate div id=game_split_tabs_* to ul class=player-tabs
+                                    for gameLogYear in gameLogYearList:
+                                        season = browser.get_form(id="criteria")
+                                        season['season'].value = gameLogYear
+                                        browser.submit_form(season)
+                                        gameLogs = browser.find(id="player-stats-wrapper")
+                                        gameLogs = gameLogs.find_all("table")
+                                        parseGameLogs(gameLogs)
+                                        
+                                    raw_input('gameLogs-->')
+                                elif tabName == 'gamesplits':
+                                    #parse game splits
+                                    years = browser.find(id="criteria")
+                                    years = years.find_all("option")
+                                    yearsList = []
+                                    for year in years:
+                                        yearsList.append(year.text.strip())
+                                    
+                                    
+
+                                    for year in yearsList:
+                                        season = browser.get_form(id="criteria")
+                                        season['season'].value = year
+                                        browser.submit_form(season)
+
+                                        gameSplits = browser.find(id="player-stats-wrapper")
+
+                                        parseGameSplits(gameSplits)
+                                    
+                                    raw_input('splits-->')
+                                elif tabName == 'situationalstats':
+                                    #parse situational stats
+                                    years = browser.find(id="criteria")
+                                    years = years.find_all("option")
+                                    yearsList = []
+                                    for year in years:
+                                        yearsList.append(year.text.strip())
+                                    
+                                    
+
+                                    for year in yearsList:
+                                        season = browser.get_form(id="criteria")
+                                        season['season'].value = year
+                                        browser.submit_form(season)
+
+                                        situationalStats = browser.find(id="player-stats-wrapper")
+
+                                        parseGameSplits(situationalStats)
+
+                                    raw_input('situational-->')
+                                elif tabName == 'draft':
+                                    draft = browser.find(id="player-stats-wrapper")
+                                    parseDraft(draft)
+                                if tabName == 'combine':
+                                    combine = browser.find(id="player-stats-wrapper")
+                                    parseCombine(combine)
+
+                                
+                            raw_input('-->')
+
+                        tableColumn += 1
+                        if tableColumn >= len(tableKey):
+                            tableColumn = 0
 
     print datetime.now()-startTime 
 
 if __name__ == '__main__':
     main()
-
-# <div class="ez-spotlights">
-# <div class="playerbio">
-# <img src="http://static.nfl.com/static/content/public/image/getty/headshot/B/R/A/BRA371156.jpg"/>
-# <p class="player">
-# <a class="player" href="http://www.nfl.com/players/TomBrady/profile?id=BRA371156">Tom Brady</a>
-# <span class="ez-bar">|</span>#12<span class="ez-bar">|</span>QB</p>
-# <p class="team">
-# <a class="team" href="http://www.nfl.com/teams/New England Patriots/profile?team=NE">New England Patriots</a>
-# </p>
-# <a class="profile" href="http://www.nfl.com/players/TomBrady/profile?id=BRA371156">Player Profile</a>
-# <span class="ez-bar">|</span>
-# <a class="stats" href="http://www.nfl.com/players/TomBrady/careerstats?id=BRA371156">Career Stats</a>
-# <span class="ez-bar">|</span>
-# <a class="logs" href="http://www.nfl.com/players/TomBrady/gamelogs?id=BRA371156">Game Logs</a>
-# <span class="ez-bar">|</span>
-# <a class="splits" href="http://www.nfl.com/players/TomBrady/gamesplits?id=BRA371156">Game Splits</a>
-# <span class="ez-bar">|</span>
-# <a class="sitstats" href="http://www.nfl.com/players/TomBrady/situationalstats?id=BRA371156">Situational Stats</a>
-# <div class="ez-clearingDiv"> </div>
-# </div></div>
