@@ -22,6 +22,9 @@ col_nfl_team_stats = db['nfl_team_stats']
 def removeNewLine(value):
     return re.sub('[\t,\n,\r]', '', value)
 
+#field goals, punt returns, scoring, offensive line
+#sacks, scoring, tackles, interceptions
+
 def parseSeason(role, category, season, seasonTypes):
     """Parses every seasonType in a season at http://www.nfl.com/stats/categorystats for a given role/category/season
     doesnt follow any links
@@ -37,7 +40,7 @@ def parseSeason(role, category, season, seasonTypes):
 
     teamStat_list = []
     for seasonType in seasonTypes:
-        if seasonType.text == "Season Type...":
+        if seasonType.text == "Season Type..." or convertToNumber(removeNewLine(season.text)) != 2015:
             continue
 
         team_stats_query = {'year': convertToNumber(removeNewLine(season.text)),
@@ -90,7 +93,18 @@ def parseSeason(role, category, season, seasonTypes):
             if len(tbodies) != 2:
                 raise Exception("error parsing result")
             tableKey = tbodies[0]
-            tableKey = tableKey.find_all("th")
+            tableKeyRows = tableKey.find_all("tr")
+            topTableKeys = []
+            if len(tableKeyRows) == 1:
+                tableKey = tableKey.find_all("th")
+            elif len(tableKeyRows) == 2:
+                topTableColumns = tableKeyRows[0].find_all("th")
+                for topTableColumn in topTableColumns:
+                    for _ in range(int(topTableColumn['colspan'])):
+                        topTableKeys.append(topTableColumn.text)
+                tableKey = tableKeyRows[1].find_all("th")
+            else:
+                raise Exception('To many header rows found')
 
             tableItems = tbodies[1]
             tableItems = tableItems.find_all("td")
@@ -112,7 +126,11 @@ def parseSeason(role, category, season, seasonTypes):
                     tableColumn += 1
                     continue
 
-                key = cleanKey(removeNewLine(tableKey[tableColumn].text))
+                if topTableKeys and topTableKeys[tableColumn]:
+                    key = topTableKeys[tableColumn] + '_' + tableKey[tableColumn].text
+                else:
+                    key = tableKey[tableColumn].text
+                key = cleanKey(removeNewLine(key))
                 value = convertToNumber(removeNewLine(tableItem.text))
                 teamStatDict[key] = value
 
@@ -178,11 +196,13 @@ def main():
         for category in availableCategories:
             if category.text == "Category...":
                 continue
+            if category.text != 'Field Goals':
+                continue
             for season in seasons:
                 if season.text == "Season..." or convertToNumber(removeNewLine(season.text)) < 1960:
                     continue
-                #parseSeason(role, category, season, seasonTypes)
-                pool.apply_async(parseSeason, (role, category, season, seasonTypes,))
+                parseSeason(role, category, season, seasonTypes)
+                #pool.apply_async(parseSeason, (role, category, season, seasonTypes,))
 
     pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
     pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
