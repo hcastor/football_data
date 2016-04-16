@@ -19,4 +19,4 @@ def convertToNumber(value):
     return value
 
 def cleanKey(value):
-    return value.replace('.', '').replace('$', '').lower()
+    return value.replace('.', '').replace('$', '').replace(' ', '_').lower().strip()
