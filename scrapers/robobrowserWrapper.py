@@ -1,7 +1,7 @@
 #Date created 2/16/16
 import time
 import random
-import csv
+import json
 from robobrowser import RoboBrowser
 from datetime import datetime
 
@@ -42,11 +42,8 @@ def get_proxy(logger):
     Reads ../proxy_list_http.csv and returns a random proxy.
     """
     proxies = []
-    with open('../proxy_list_http.csv', 'rb') as csvfile:
-        reader = csv.DictReader(csvfile)
-        
-        for row in reader:
-            proxies.append('http://' + row['IP Address'] + ':' + row['Port'])
+    with open('../proxy_list_http.json', 'rb') as jsonfile:
+        proxies = json.load(jsonfile)
 
     index = random.randint(0,len(proxies)-1)
 
@@ -58,14 +55,11 @@ def get_proxy_count():
     """
     Reads ../proxy_list_http.csv and returns the total number of proxies.
     """
-    count = 0
-    with open('../proxy_list_http.csv', 'rb') as csvfile:
-        reader = csv.DictReader(csvfile)
-        
-        for row in reader:
-            count += 1
 
-    return count
+    with open('../proxy_list_http.json', 'rb') as jsonfile:
+        proxies = json.load(jsonfile)
+
+        return len(proxies)
 
 def get_user_agent(logger):
     """
