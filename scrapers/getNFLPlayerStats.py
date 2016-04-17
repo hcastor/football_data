@@ -120,10 +120,17 @@ def parseCareerStats(logger, careerStats, player_profile_id):
                     tableColumn = 0
             except:
                 logger.exception('failed parsing row %d of %s', index, tableName)
+                while(tableColumn < len(tableKey)):
+                    tableColumn += 1
+                rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id}
+
 
     try:
         logger.debug('Bulk Creating careerStats_list')
-        col_player_career_stats.insert_many(careerStats_list)
+        if careerStats_list:
+            col_player_career_stats.insert_many(careerStats_list)
+        else:
+            logger.debug('Nothing to insert')
     except:
         logger.exception('insert_many error')
 
@@ -166,7 +173,7 @@ def parseGameLogs(logger, gameLogs, year, player_profile_id):
 
             tableItems = gameLog.find("tbody").find_all("td")
 
-            rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id, 'year': convertToNumber(year)}
+            rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year)}
             tableColumn = 0
             byeWeek = False
             columnsSkip = 0
@@ -228,7 +235,11 @@ def parseGameLogs(logger, gameLogs, year, player_profile_id):
                         continue
 
                     if tableColumn == 3:
-                        outCome = item.find("span").text.strip()
+                        outCome = item.find("span")
+                        if not outCome:
+                            outCome = 'T'
+                        else:
+                            outCome = outCome.text.strip()
                         score = None
                         linksFound = len(item.find_all("a"))
                         if linksFound == 1:
@@ -246,15 +257,21 @@ def parseGameLogs(logger, gameLogs, year, player_profile_id):
                     tableColumn += 1
                     if tableColumn >= len(tableKey):
                         gameLogs_list.append(rowDict)
-                        rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id, 'year': convertToNumber(year)}
+                        rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year)}
                         tableColumn = 0
                         byeWeek = False
             except:
-                logger.exception('failed parsing row %d of %s', index, tableName)
+                logger.exception('failed parsing row %d of %s. Skipping the row', index, tableName)
+                while(tableColumn < len(tableKey)):
+                    tableColumn += 1
+                rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year)}
 
     try:
         logger.debug('Bulk Creating gameLogs_list')
-        col_player_game_logs.insert_many(gameLogs_list)
+        if gameLogs_list:
+            col_player_game_logs.insert_many(gameLogs_list)
+        else:
+            logger.debug('Nothing to insert')
     except:
         logger.exception('insert_many error')
 
@@ -321,10 +338,16 @@ def parseSplits(logger, splits, year, splitType, player_profile_id):
                         rowDict = {'currentTabText': currentTabText, 'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year), 'splitType': splitType}
                 except:
                     logger.exception('failed parsing row %d of %s', rowIndex, tableName)
+                    while(tableColumn < len(tableKey)):
+                        tableColumn += 1
+                    rowDict = {'currentTabText': currentTabText, 'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year), 'splitType': splitType}
 
     try:
         logger.debug('Bulk Creating splits_list')
-        col_player_splits.insert_many(splits_list)
+        if splits_list:
+            col_player_splits.insert_many(splits_list)
+        else:
+            logger.debug('Nothing to insert')
     except:
         logger.exception('insert_many error')
 
@@ -448,6 +471,8 @@ def parsePlayerNames(statisticCategory, season, seasonType):
                 logger.exception('failed parsing row %d of %d', tableIndex, len(tableItems))
 
     logger.debug('parsePlayerNames time elapsed: ' + str(datetime.now() - startTime))
+
+    closeLogger(logName)
     
     return playerUrl_set
 
@@ -516,8 +541,8 @@ def parsePlayer(playerUrl):
                 parseGameLogs(logger, gameLogs, yearsList[0], player_profile_id)
 
                 #Parse the rest of the years
-                for gameLogYear in yearsList[1:]:
-                    playerUrl = getPlayerTabUrl(playerUrl, tabName) + '?season=' + gameLogYear
+                for year in yearsList[1:]:
+                    playerUrl = getPlayerTabUrl(playerUrl, tabName) + '?season=' + year
                     wait = random.uniform(1.5,3.5)
                     logger.debug('Waiting %f', wait)
                     time.sleep(wait)
@@ -525,7 +550,7 @@ def parsePlayer(playerUrl):
                     browser = open_or_follow_link(logger, browser, 'open', playerUrl)
                     gameLogs = browser.find(id="player-stats-wrapper")
                     gameLogs = gameLogs.find_all("table")
-                    parseGameLogs(logger, gameLogs, gameLogYear, player_profile_id)
+                    parseGameLogs(logger, gameLogs, year, player_profile_id)
 
             elif tabName == 'gamesplits':
                 #Get the list of years
@@ -543,7 +568,7 @@ def parsePlayer(playerUrl):
 
                 #Parse the rest of the years
                 for year in yearsList[1:]:
-                    playerUrl = getPlayerTabUrl(playerUrl, tabName) + '?season=' + gameLogYear
+                    playerUrl = getPlayerTabUrl(playerUrl, tabName) + '?season=' + year
                     wait = random.uniform(1.5,3.5)
                     logger.debug('Waiting %f', wait)
                     time.sleep(wait)
@@ -568,7 +593,7 @@ def parsePlayer(playerUrl):
 
                 #Parse the rest of the years
                 for year in yearsList[1:]:
-                    playerUrl = getPlayerTabUrl(playerUrl, tabName) + '?season=' + gameLogYear
+                    playerUrl = getPlayerTabUrl(playerUrl, tabName) + '?season=' + year
                     wait = random.uniform(1.5,3.5)
                     logger.debug('Waiting %f', wait)
                     time.sleep(wait)
@@ -587,6 +612,8 @@ def parsePlayer(playerUrl):
         logger.exception('Failed parsing player')
 
     logger.debug('parsePlayer time elapsed: ' + str(datetime.now() - startTime))
+
+    closeLogger(playerId)
 
 def main():
 
@@ -611,7 +638,7 @@ def main():
     seasonTypes = seasonType.find_all("option")
 
     for statisticCategory in statisticCategories:
-        if statisticCategory.text == 'Category...' or statisticCategory.text != 'Passing':
+        if statisticCategory.text == 'Category...':
             continue
         for season in seasons:
             if season.text == 'Season...' or int(season.text) != 2015:
@@ -632,9 +659,10 @@ def main():
 
     pool = Pool(processes=int(get_proxy_count()/2.5))
 
+    logger.debug('Starting to parse %d players', len(playerUrl_set))
     for playerUrl in playerUrl_set:
         #parsePlayer(playerUrl)
-        pool.apply_async(parsePlayer, playerUrl)
+        pool.apply_async(parsePlayer, (playerUrl,))
 
     pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
     pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
