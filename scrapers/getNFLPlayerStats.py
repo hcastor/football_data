@@ -2,6 +2,8 @@
 import sys
 import re
 import json
+import random
+import time
 from collections import defaultdict
 from robobrowser import RoboBrowser
 from pymongo import MongoClient
@@ -28,15 +30,19 @@ col_player_combines = db['player_combines']
 #offensive lineman are missing
 
 def getPlayerTabUrl(playerUrl, tabName):
+    """
+    Each player has a base url and then /category at the end.
+    This returns a given url, takes the last /_ off and adds tabName
+    """
     return ''.join(playerUrl.rsplit('/', 1)[:-1]) + '/' + tabName
 
-def parsePlayerBio(logger, playerBio, playerUrl):
+def parsePlayerBio(logger, playerBio, playerUrl, playerUrl_api):
 
     startTime = datetime.now()
 
     logger.debug('Starting playerBio')
 
-    playerBioDict = {'player_url': playerUrl}
+    playerBioDict = {'player_url': playerUrl, 'playerUrl_api': playerUrl_api}
     for lineNumber, line in enumerate(playerBio.find_all('p')):
         try:
             if lineNumber == 0:
@@ -53,19 +59,17 @@ def parsePlayerBio(logger, playerBio, playerUrl):
                 playerBioDict.update({keyValue[0].strip(): keyValue[1].strip() for keyValue in re.findall('(.*): ?(.*)', line.text)})
         except:
             logger.exception('failed parsing playerBio %s', playerUrl)
-            return False
+            return
     
     try:
-        logger.debug('Checking if player profile exists again')
+        logger.debug('Checking if player profile exists')
         if col_player_profiles.find({'player_url': playerUrl}).count():
             logger.debug('player profile exists')
-            return False
+            return
         logger.debug('Creating playerBioDict')
         return col_player_profiles.insert(playerBioDict)
     except:
         logger.exception('insert_many error')
-
-    print False
 
 def parseCareerStats(logger, careerStats, player_profile_id):
     """
@@ -95,7 +99,6 @@ def parseCareerStats(logger, careerStats, player_profile_id):
             continue
 
         for index, item in enumerate(tableItems, start=1):
-            logger.debug('Row %d of %d', index/len(tableKey), len(tableItems))
             try:
                 if 'class' in item.attrs:
                     if item.attrs['class'][0] == 'border-td':
@@ -103,6 +106,7 @@ def parseCareerStats(logger, careerStats, player_profile_id):
                     if item.attrs['class'][0] == 'player-totals':
                         break
                 if tableColumn == 0:
+                    logger.debug('Row %d of %d', index, len(tableItems))
                     rowDict['rowYear'] = convertToNumber(item.text.strip())
                     tableColumn += 1
                     continue
@@ -115,7 +119,7 @@ def parseCareerStats(logger, careerStats, player_profile_id):
                     rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id}
                     tableColumn = 0
             except:
-                logger.exception('failed parsing row %d of %s', index/len(tableKey), tableName)
+                logger.exception('failed parsing row %d of %s', index, tableName)
 
     try:
         logger.debug('Bulk Creating careerStats_list')
@@ -172,7 +176,6 @@ def parseGameLogs(logger, gameLogs, year, player_profile_id):
             continue
 
         for index, item in enumerate(tableItems):
-            logger.debug('Row %d of %d', index/len(tableKey), len(tableItems))
             try:
                 if byeWeek:
                     if columnsSkip >= len(tableKey)-3:
@@ -195,6 +198,7 @@ def parseGameLogs(logger, gameLogs, year, player_profile_id):
                                 break
 
                 if tableColumn == 0:
+                    logger.debug('Row %d of %d', index, len(tableItems))
                     rowDict['week'] = convertToNumber(item.text.strip())
                     tableColumn += 1
                     continue
@@ -246,7 +250,7 @@ def parseGameLogs(logger, gameLogs, year, player_profile_id):
                         tableColumn = 0
                         byeWeek = False
             except:
-                logger.exception('failed parsing row %d of %s', index/len(tableKey), tableName)
+                logger.exception('failed parsing row %d of %s', index, tableName)
 
     try:
         logger.debug('Bulk Creating gameLogs_list')
@@ -261,7 +265,7 @@ def parseSplits(logger, splits, year, splitType, player_profile_id):
     """
     startTime = datetime.now()
 
-    logger.debug('Starting %s', splitType)
+    logger.debug('Starting %s splits', splitType)
     
     try:
         tabs = splits.find(class_="player-tabs")
@@ -289,20 +293,20 @@ def parseSplits(logger, splits, year, splitType, player_profile_id):
                 tableName = tableKey[0].text.strip()
 
                 tableItems = table.find('tbody').find_all('td')
-                rowDict = {'currentTabText': currentTabText, 'tableName': tableName, 'player_profile_id': player_profile_id, 'year': convertToNumber(year), 'splitType': splitType}
+                rowDict = {'currentTabText': currentTabText, 'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year), 'splitType': splitType}
                 tableColumn = 0
             except:
                 logger.exception('failed parsing player table %d of %d', tableIndex, len(tables))
                 continue
 
             for rowIndex, item in enumerate(tableItems):
-                logger.debug('Row %d of %d', rowIndex/len(tableKey), len(tableItems))
                 try:
                     if 'class' in item.attrs:
                         if item.attrs['class'][0] == 'border-td':
                             continue
 
                     if tableColumn == 0:
+                        logger.debug('Row %d of %d', rowIndex, len(tableItems))
                         rowName = item.text.strip()
                         rowDict['rowName'] = rowName
                         tableColumn += 1
@@ -314,9 +318,9 @@ def parseSplits(logger, splits, year, splitType, player_profile_id):
                     if tableColumn >= len(tableKey):
                         splits_list.append(rowDict)
                         tableColumn = 0
-                        rowDict = {'currentTabText': currentTabText, 'tableName': tableName, 'player_profile_id': player_profile_id, 'year': convertToNumber(year), 'splitType': splitType}
+                        rowDict = {'currentTabText': currentTabText, 'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year), 'splitType': splitType}
                 except:
-                    logger.exception('failed parsing row %d of %s', rowIndex/len(tableKey), tableName)
+                    logger.exception('failed parsing row %d of %s', rowIndex, tableName)
 
     try:
         logger.debug('Bulk Creating splits_list')
@@ -377,6 +381,212 @@ def parseCombine(logger, combine, player_profile_id):
 
     logger.debug('parseCombine time elapsed: ' + str(datetime.now() - startTime))
 
+def parsePlayerNames(statisticCategory, season, seasonType):
+    
+    startTime = datetime.now()
+    
+    logName = statisticCategory + '_' + season + '_' + seasonType
+    logger = makeLogger(logName, r'./logs_nflPlayerStats/')
+
+    logger.debug('Starting parsePlayerNames')
+
+    browser = RoboBrowser(history=False,  parser='html5lib', user_agent=get_user_agent(logger), timeout=10)
+
+    playerUrl_set = set()
+    loadNextPage = True
+    pageNumber = 1
+    while(loadNextPage):
+        logger.debug('Page %d', pageNumber)
+        url = 'http://www.nfl.com/stats/categorystats?tabSeq=0&statisticCategory=' + statisticCategory + '&qualified=true&season=' + season + '&seasonType=' + seasonType + '&d-447263-p=' + str(pageNumber)
+        browser = open_or_follow_link(logger, browser, 'open', url)
+        pageNumber += 1
+        linkNavigation = browser.find(class_='linkNavigation')
+        if not linkNavigation or pageNumber > len(linkNavigation.find_all('a')):
+            loadNextPage = False
+
+        result = browser.find(id="result")
+
+        tries = 0
+        # sometimes when using slow proxies nfl.com returns 200 without the whole page being loaded
+        while not result:
+            if tries > 10:
+                raise Exception('No teams found %s' % url)
+            elif tries > 0:
+                time.sleep(random.uniform(5, 7))
+            tries += 1
+            logger.debug('No result-tries: %d', tries)
+            browser = RoboBrowser(history=False,  parser='html5lib', user_agent=get_user_agent(logger), timeout=10)
+            browser = open_or_follow_link(logger, browser, 'open', url)
+            result = browser.find(id="result")
+
+        tbodies = result.find_all("tbody")
+        if len(tbodies) != 2:
+            raise Exception("error parsing result")
+        
+        tableKey = tbodies[0]
+        tableKey = tableKey.find_all("th")
+
+        tableItems = tbodies[1]
+        tableItems = tableItems.find_all("td")
+
+        tableColumn = 0
+        teamStatDict = {}
+        for tableIndex, tableItem in enumerate(tableItems):
+            try:
+                if tableColumn == 0:
+                    logger.debug('Row %d of %d', tableIndex, len(tableItems))
+                    tableColumn += 1
+                    continue
+
+                if tableColumn == 1:
+                    playerUrl_set.add('http://www.nfl.com' + tableItem.find('a')['href'])
+
+                tableColumn += 1
+                if tableColumn >= len(tableKey):
+                    tableColumn = 0
+            except:
+                logger.exception('failed parsing row %d of %d', tableIndex, len(tableItems))
+
+    logger.debug('parsePlayerNames time elapsed: ' + str(datetime.now() - startTime))
+    
+    return playerUrl_set
+
+def parsePlayer(playerUrl):
+
+    startTime = datetime.now()
+
+    playerId = re.search('.*?id=(.*)\?*', playerUrl).group(1)
+    logger = makeLogger(playerId, r'./logs_nflPlayerStats/')
+
+    #html5lib parser required for broken html on gameSplits
+    browser = RoboBrowser(history=False,  parser='html5lib', user_agent=get_user_agent(logger), timeout=10)
+    
+    wait = random.uniform(2,4)
+    logger.debug('Waiting %f', wait)
+    time.sleep(wait)
+    logger.debug('Opening %s', playerUrl)
+    browser = open_or_follow_link(logger, browser, 'open', playerUrl)
+    
+    #gets the actual playerUrl, the orignal value gets redirected
+    playerUrl_api = playerUrl
+    playerUrl = browser.url
+
+    try:
+        #parsePlayer BIO
+        playerBio = browser.find(class_="player-info")
+        player_profile_id = parsePlayerBio(logger, playerBio, playerUrl, playerUrl_api)
+        if not player_profile_id:
+            logger.debug('New player profile not made, skiping rest of tabs')
+            return
+
+        #Gets the links for each category tab, i.e Profile, career stats, game logs ...    
+        tabNames = [tabName['href'] for tabName in browser.find(id="player-profile-tabs").find_all('a')]
+        for tabName in tabNames:
+            if tabName == 'profile':
+                continue
+
+            playerUrl = getPlayerTabUrl(playerUrl, tabName)
+
+            wait = random.uniform(1.5,3.5)
+            logger.debug('Waiting %f', wait)
+            time.sleep(wait)
+            logger.debug('Opening %s', playerUrl)
+            browser = open_or_follow_link(logger, browser, 'open', playerUrl)
+
+
+            if tabName == 'careerstats':
+                #parse careerstats
+                careerStats = browser.find(id="player-stats-wrapper")
+                careerStats = careerStats.find_all("table")
+                parseCareerStats(logger, careerStats, player_profile_id)
+
+            elif tabName == 'gamelogs':
+                #Get the list of years
+                gameLogYears = browser.find(id="criteria")
+                gameLogYears = gameLogYears.find_all("option")
+                yearsList = []
+                for year in gameLogYears:
+                    year = year.text.strip()
+                    if year:
+                        yearsList.append(year)
+
+                #parse the first year of gameLogs since its already loaded
+                gameLogs = browser.find(id="player-stats-wrapper")
+                gameLogs = gameLogs.find_all("table")
+                parseGameLogs(logger, gameLogs, yearsList[0], player_profile_id)
+
+                #Parse the rest of the years
+                for gameLogYear in yearsList[1:]:
+                    playerUrl = getPlayerTabUrl(playerUrl, tabName) + '?season=' + gameLogYear
+                    wait = random.uniform(1.5,3.5)
+                    logger.debug('Waiting %f', wait)
+                    time.sleep(wait)
+                    logger.debug('Opening %s', playerUrl)
+                    browser = open_or_follow_link(logger, browser, 'open', playerUrl)
+                    gameLogs = browser.find(id="player-stats-wrapper")
+                    gameLogs = gameLogs.find_all("table")
+                    parseGameLogs(logger, gameLogs, gameLogYear, player_profile_id)
+
+            elif tabName == 'gamesplits':
+                #Get the list of years
+                years = browser.find(id="criteria")
+                years = years.find_all("option")
+                yearsList = []
+                for year in years:
+                    year = year.text.strip()
+                    if year:
+                        yearsList.append(year)
+
+                #parse the first year of gamesplits since its already loaded
+                gameSplits = browser.find(id="player-stats-wrapper")
+                parseSplits(logger, gameSplits, yearsList[0], 'game', player_profile_id)
+
+                #Parse the rest of the years
+                for year in yearsList[1:]:
+                    playerUrl = getPlayerTabUrl(playerUrl, tabName) + '?season=' + gameLogYear
+                    wait = random.uniform(1.5,3.5)
+                    logger.debug('Waiting %f', wait)
+                    time.sleep(wait)
+                    logger.debug('Opening %s', playerUrl)
+                    browser = open_or_follow_link(logger, browser, 'open', playerUrl)
+                    gameSplits = browser.find(id="player-stats-wrapper")
+                    parseSplits(logger, gameSplits, year, 'game', player_profile_id)
+
+            elif tabName == 'situationalstats':
+                #Get the list of years
+                years = browser.find(id="criteria")
+                years = years.find_all("option")
+                yearsList = []
+                for year in years:
+                    year = year.text.strip()
+                    if year:
+                        yearsList.append(year)
+                
+                #parse the first year of gamesplits since its already loaded
+                situationalStats = browser.find(id="player-stats-wrapper")
+                parseSplits(logger, situationalStats, yearsList[0], 'situational', player_profile_id)
+
+                #Parse the rest of the years
+                for year in yearsList[1:]:
+                    playerUrl = getPlayerTabUrl(playerUrl, tabName) + '?season=' + gameLogYear
+                    wait = random.uniform(1.5,3.5)
+                    logger.debug('Waiting %f', wait)
+                    time.sleep(wait)
+                    logger.debug('Opening %s', playerUrl)
+                    browser = open_or_follow_link(logger, browser, 'open', playerUrl)
+                    situationalStats = browser.find(id="player-stats-wrapper")
+                    parseSplits(logger, situationalStats, year, 'situational', player_profile_id)
+
+            elif tabName == 'draft':
+                draft = browser.find(id="player-stats-wrapper")
+                parseDraft(logger, draft, player_profile_id)
+            elif tabName == 'combine':
+                combine = browser.find(id="player-stats-wrapper")
+                parseCombine(logger, combine, player_profile_id)
+    except:
+        logger.exception('Failed parsing player')
+
+    logger.debug('parsePlayer time elapsed: ' + str(datetime.now() - startTime))
 
 def main():
 
@@ -384,13 +594,14 @@ def main():
     print startTime
 
     logger = makeLogger('main', r'./logs_nflPlayerStats/')
-
-    playerUrl_set = set()
+    
+    pool = Pool(processes=int(get_proxy_count()/2.5))
+    results = []
 
     #html5lib parser required for broken html on gameSplits
-    browser = RoboBrowser(history=False, parser='html5lib')
-
-    browser.open('http://www.nfl.com/stats/categorystats?tabSeq=0&statisticCategory=PASSING&qualified=true&season=2015&seasonType=PRE')
+    browser = RoboBrowser(history=False,  parser='html5lib', user_agent=get_user_agent(logger), timeout=10)
+    startingUrl = 'http://www.nfl.com/stats/categorystats?tabSeq=0&statisticCategory=PASSING&qualified=true&season=2015&seasonType=PRE'
+    browser = open_or_follow_link(logger, browser, 'open', startingUrl)
 
     statisticCategory = browser.find(id="statistic-category")
     statisticCategories = statisticCategory.find_all("option")
@@ -400,154 +611,36 @@ def main():
     seasonTypes = seasonType.find_all("option")
 
     for statisticCategory in statisticCategories:
-        if statisticCategory.text == 'Category...':
+        if statisticCategory.text == 'Category...' or statisticCategory.text != 'Passing':
             continue
         for season in seasons:
-            if season.text == 'Season...':
+            if season.text == 'Season...' or int(season.text) != 2015:
                 continue
             for seasonType in seasonTypes:
                 if seasonType.text == 'Season Type...':
                     continue
+                results.append(pool.apply_async(parsePlayerNames, (statisticCategory['value'], season['value'], seasonType['value'],)))
+    
+    pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
+    pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
 
-                loadNextPage = True
-                pageNumber = 1
-                while(loadNextPage):
+    playerUrl_set = set()
+    for result in results:
+        result_set = result.get()
+        if result_set:
+            playerUrl_set = playerUrl_set.union(result_set)
 
-                    browser.open('http://www.nfl.com/stats/categorystats?tabSeq=0&statisticCategory=' + statisticCategory['value'] + '&qualified=true&season=' + season['value'] + '&seasonType=' + seasonType['value'] + '&d-447263-p=' + str(pageNumber))
-                    pageNumber += 1
-                    linkNavigation = browser.find(class_='linkNavigation')
-                    if not linkNavigation or pageNumber > len(linkNavigation.find_all('a')):
-                        loadNextPage = False
-
-                    result = browser.find(id="result")
-
-                    tries = 0
-                    # sometimes when using slow proxies nfl.com returns 200 without the whole page being loaded
-                    while not result:
-                        if tries > 10:
-                            raise Exception('No teams found %s' % url)
-                        elif tries > 0:
-                            time.sleep(random.uniform(5, 7))
-                        tries += 1
-                        logger.debug('No result-tries: %d', tries)
-                        browser = RoboBrowser(history=False,  parser='html5lib', user_agent=get_user_agent(logger), timeout=10)
-                        browser = open_or_follow_link(logger, browser, 'open', url)
-                        result = browser.find(id="result")
-
-                    tbodies = result.find_all("tbody")
-                    if len(tbodies) != 2:
-                        raise Exception("error parsing result")
-                    tableKey = tbodies[0]
-                    tableKey = tableKey.find_all("th")
-
-                    tableItems = tbodies[1]
-                    tableItems = tableItems.find_all("td")
-
-                    tableColumn = 0
-                    teamStatDict = {}
-                    for tableIndex, tableItem in enumerate(tableItems):
-                        if tableColumn == 0:
-                            #logger.debug('Row %d of %d', tableIndex, len(tableItems))
-                            tableColumn += 1
-                            continue
-
-                        if tableColumn == 1:
-                            playerUrl_set.add('http://www.nfl.com' + tableItem.find('a')['href'])
-                            raw_input('-->')
-
-                        tableColumn += 1
-                        if tableColumn >= len(tableKey):
-                            tableColumn = 0
+    pool = Pool(processes=int(get_proxy_count()/2.5))
 
     for playerUrl in playerUrl_set:
-        browser.open(playerUrl)
-                                
-        #parsePlayer BIO
-        playerBio = browser.find(class_="player-info")
-        player_profile_id = parsePlayerBio(logger, playerBio, playerUrl)
-        raw_input('playerBio-->')
+        #parsePlayer(playerUrl)
+        pool.apply_async(parsePlayer, playerUrl)
 
-        playerUrl = browser.url
-        tabNames = [tabName['href'] for tabName in browser.find(id="player-profile-tabs").find_all('a')]
-        for tabName in tabNames:
-            playerUrl = getPlayerTabUrl(playerUrl, tabName)
+    pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
+    pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
 
-            if tabName == 'profile':
-                continue
-
-            print playerUrl
-            browser.open(playerUrl)
-
-            if tabName == 'careerstats':
-                careerStats = browser.find(id="player-stats-wrapper")
-                careerStats = careerStats.find_all("table")
-                parseCareerStats(logger, careerStats, player_profile_id)
-
-                raw_input('careerStats-->')
-            elif tabName == 'gamelogs':
-                #parse gameLogs
-                gameLogYears = browser.find(id="criteria")
-                gameLogYears = gameLogYears.find_all("option")
-                gameLogYearList = []
-                for gameLogYear in gameLogYears:
-                    gameLogYearList.append(gameLogYear.text.strip())
-
-                for gameLogYear in gameLogYearList:
-                    season = browser.get_form(id="criteria")
-                    season['season'].value = gameLogYear
-                    browser.submit_form(season)
-                    gameLogs = browser.find(id="player-stats-wrapper")
-                    gameLogs = gameLogs.find_all("table")
-                    parseGameLogs(logger, gameLogs, gameLogYear, player_profile_id)
-                    
-                raw_input('gameLogs-->')
-            elif tabName == 'gamesplits':
-                #parse game splits
-                years = browser.find(id="criteria")
-                years = years.find_all("option")
-                yearsList = []
-                for year in years:
-                    yearsList.append(year.text.strip())
-                
-                
-
-                for year in yearsList:
-                    season = browser.get_form(id="criteria")
-                    season['season'].value = year
-                    browser.submit_form(season)
-
-                    gameSplits = browser.find(id="player-stats-wrapper")
-
-                    parseGameSplits(logger, gameSplits, year, 'game', player_profile_id)
-                
-                raw_input('splits-->')
-            elif tabName == 'situationalstats':
-                #parse situational stats
-                years = browser.find(id="criteria")
-                years = years.find_all("option")
-                yearsList = []
-                for year in years:
-                    yearsList.append(year.text.strip())
-                
-                
-
-                for year in yearsList:
-                    season = browser.get_form(id="criteria")
-                    season['season'].value = year
-                    browser.submit_form(season)
-
-                    situationalStats = browser.find(id="player-stats-wrapper")
-
-                    parseGameSplits(logger, situationalStats, year, 'situational', player_profile_id)
-
-                raw_input('situational-->')
-            elif tabName == 'draft':
-                draft = browser.find(id="player-stats-wrapper")
-                parseDraft(logger, draft, player_profile_id)
-            if tabName == 'combine':
-                combine = browser.find(id="player-stats-wrapper")
-                parseCombine(logger, combine, player_profile_id)
-
+        
+    logger.debug('main time elapsed: ' + str(datetime.now() - startTime))
     print datetime.now()-startTime 
 
 if __name__ == '__main__':
