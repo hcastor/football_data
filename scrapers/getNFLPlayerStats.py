@@ -37,6 +37,9 @@ def getPlayerTabUrl(playerUrl, tabName):
     return ''.join(playerUrl.rsplit('/', 1)[:-1]) + '/' + tabName
 
 def parsePlayerBio(logger, playerBio, playerUrl, playerUrl_api):
+    """
+    Parses the player bio at the top of each players page. Occurs on all tabs.
+    """
 
     startTime = datetime.now()
 
@@ -279,6 +282,9 @@ def parseGameLogs(logger, gameLogs, year, player_profile_id):
 
 def parseSplits(logger, splits, year, splitType, player_profile_id):
     """
+    splitType: game or situational 
+    Parses 1 year of games splits or situational stats for given player.
+    Stores each row in its own doc
     """
     startTime = datetime.now()
 
@@ -329,7 +335,7 @@ def parseSplits(logger, splits, year, splitType, player_profile_id):
                         tableColumn += 1
                         continue
 
-                    rowDict[cleanKey(tableKey[tableColumn].text)] = item.text.strip()
+                    rowDict[cleanKey(tableKey[tableColumn].text)] = convertToNumber(item.text.strip())
 
                     tableColumn += 1
                     if tableColumn >= len(tableKey):
@@ -354,6 +360,9 @@ def parseSplits(logger, splits, year, splitType, player_profile_id):
     logger.debug('parseSplits time elapsed: ' + str(datetime.now() - startTime))
 
 def parseDraft(logger, draft, player_profile_id):
+    """
+    Trys to parse the draft tab, only newer players have it
+    """
     
     startTime = datetime.now()
 
@@ -380,6 +389,9 @@ def parseDraft(logger, draft, player_profile_id):
 
 
 def parseCombine(logger, combine, player_profile_id):
+    """
+    Trys to parse the combine tab, only newer players have it
+    """
     startTime = datetime.now()
 
     logger.debug('Starting parseCombine')
@@ -405,6 +417,10 @@ def parseCombine(logger, combine, player_profile_id):
     logger.debug('parseCombine time elapsed: ' + str(datetime.now() - startTime))
 
 def parsePlayerNames(statisticCategory, season, seasonType):
+    """
+    Collects a set of player names from player stats by category tab.
+    This parses just 1 of the options given in the form. Uses with pool.async
+    """
     
     startTime = datetime.now()
     
@@ -477,6 +493,10 @@ def parsePlayerNames(statisticCategory, season, seasonType):
     return playerUrl_set
 
 def parsePlayer(playerUrl):
+    """
+    Starting point to parsing all pages for a given player.
+    Collects all links for a player and calls the approiate parsers for each link.
+    """
 
     startTime = datetime.now()
 
@@ -616,6 +636,11 @@ def parsePlayer(playerUrl):
     closeLogger(playerId)
 
 def main():
+    """
+    First collects a set of playerUrls to parse using, parsePlayerNames.
+    Then parses each player.
+    Both tasks use multiprocessing
+    """
 
     startTime = datetime.now()
     print startTime
