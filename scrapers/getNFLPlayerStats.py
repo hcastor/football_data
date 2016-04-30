@@ -17,7 +17,7 @@ from logWrapper import makeLogger, closeLogger
 from utilities import convertToNumber, cleanKey
 
 client = MongoClient('localhost', 27017)
-db = client['fantasy']
+db = client['nfl_data']
 col_player_profiles = db['player_profiles']
 col_player_career_stats = db['player_career_stats']
 col_player_game_logs = db['player_game_logs']
@@ -26,7 +26,7 @@ col_player_drafts = db['player_drafts']
 col_player_combines = db['player_combines']
 
 
-#connect each player colection to nfl_team_stats, fanduel_prices, nfl_schedule
+#connect each player colection to team_stats, fanduel_prices, nfl_schedule
 #offensive lineman are missing
 
 def getPlayerTabUrl(playerUrl, tabName):
@@ -94,7 +94,7 @@ def parseCareerStats(logger, careerStats, player_profile_id):
             
             tableItems = careerStat.find("tbody").find_all("td")
 
-            rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id}
+            rowDict = {'category': tableName, 'player_profile_id': player_profile_id}
             rowYear = None
             tableColumn = 0
         except:
@@ -110,7 +110,7 @@ def parseCareerStats(logger, careerStats, player_profile_id):
                         break
                 if tableColumn == 0:
                     logger.debug('Row %d of %d', index, len(tableItems))
-                    rowDict['rowYear'] = convertToNumber(item.text.strip())
+                    rowDict['year'] = convertToNumber(item.text.strip())
                     tableColumn += 1
                     continue
 
@@ -119,13 +119,13 @@ def parseCareerStats(logger, careerStats, player_profile_id):
                 tableColumn += 1
                 if tableColumn >= len(tableKey):
                     careerStats_list.append(rowDict)
-                    rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id}
+                    rowDict = {'category': tableName, 'player_profile_id': player_profile_id}
                     tableColumn = 0
             except:
                 logger.exception('failed parsing row %d of %s', index, tableName)
                 while(tableColumn < len(tableKey)):
                     tableColumn += 1
-                rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id}
+                rowDict = {'category': tableName, 'player_profile_id': player_profile_id}
 
 
     try:
@@ -176,7 +176,7 @@ def parseGameLogs(logger, gameLogs, year, player_profile_id):
 
             tableItems = gameLog.find("tbody").find_all("td")
 
-            rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year)}
+            rowDict = {'category': tableName, 'player_profile_id': player_profile_id, 'year': int(year)}
             tableColumn = 0
             byeWeek = False
             columnsSkip = 0
@@ -260,14 +260,14 @@ def parseGameLogs(logger, gameLogs, year, player_profile_id):
                     tableColumn += 1
                     if tableColumn >= len(tableKey):
                         gameLogs_list.append(rowDict)
-                        rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year)}
+                        rowDict = {'category': tableName, 'player_profile_id': player_profile_id, 'year': int(year)}
                         tableColumn = 0
                         byeWeek = False
             except:
                 logger.exception('failed parsing row %d of %s. Skipping the row', index, tableName)
                 while(tableColumn < len(tableKey)):
                     tableColumn += 1
-                rowDict = {'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year)}
+                rowDict = {'category': tableName, 'player_profile_id': player_profile_id, 'year': int(year)}
 
     try:
         logger.debug('Bulk Creating gameLogs_list')
@@ -316,7 +316,7 @@ def parseSplits(logger, splits, year, splitType, player_profile_id):
                 tableName = tableKey[0].text.strip()
 
                 tableItems = table.find('tbody').find_all('td')
-                rowDict = {'currentTabText': currentTabText, 'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year), 'splitType': splitType}
+                rowDict = {'currentTabText': currentTabText, 'category': tableName, 'player_profile_id': player_profile_id, 'year': int(year), 'splitType': splitType}
                 tableColumn = 0
             except:
                 logger.exception('failed parsing player table %d of %d', tableIndex, len(tables))
@@ -341,12 +341,12 @@ def parseSplits(logger, splits, year, splitType, player_profile_id):
                     if tableColumn >= len(tableKey):
                         splits_list.append(rowDict)
                         tableColumn = 0
-                        rowDict = {'currentTabText': currentTabText, 'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year), 'splitType': splitType}
+                        rowDict = {'currentTabText': currentTabText, 'category': tableName, 'player_profile_id': player_profile_id, 'year': int(year), 'splitType': splitType}
                 except:
                     logger.exception('failed parsing row %d of %s', rowIndex, tableName)
                     while(tableColumn < len(tableKey)):
                         tableColumn += 1
-                    rowDict = {'currentTabText': currentTabText, 'tableName': tableName, 'player_profile_id': player_profile_id, 'year': int(year), 'splitType': splitType}
+                    rowDict = {'currentTabText': currentTabText, 'category': tableName, 'player_profile_id': player_profile_id, 'year': int(year), 'splitType': splitType}
 
     try:
         logger.debug('Bulk Creating splits_list')

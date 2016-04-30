@@ -25,7 +25,7 @@ def parseWeek(year, week):
     logger.debug('Starting %d', year)
 
     client = MongoClient('localhost', 27017)
-    db = client['fantasy']
+    db = client['nfl_data']
     col_fanduel_prices = db['fanduel_prices']
 
     if col_fanduel_prices.find({'year': year, 'yeek': week}).count():

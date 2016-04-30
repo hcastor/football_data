@@ -11,11 +11,11 @@ from multiprocessing import Pool
 from robobrowserWrapper import open_or_follow_link, get_proxy_count, get_user_agent
 sys.path.append('../')
 from logWrapper import makeLogger, closeLogger
-from utilities import convertToInt, cleanKey
+from utilities import convertToNumber, cleanKey
 
 client = MongoClient('localhost', 27017)
-db = client['fantasy']
-col_nfl_schedule = db['nfl_schedule']
+db = client['nfl_data']
+col_schedule = db['schedule']
 col_weather_info = db['weather_info']
 col_stadium_info = db['stadium_info']
 
@@ -82,25 +82,25 @@ def parseWeek(year, week):
                 for each in weatherItems:
                     split = each.text.strip().split(':')
                     if len(split) == 2:
-                        weatherInfo[cleanKey(split[0].strip())] = convertToInt(split[1].strip())
+                        weatherInfo[cleanKey(split[0].strip())] = convertToNumber(split[1].strip())
                 
                 for index, each in enumerate(stadiumItems):
                     split = each.text.strip().split(':')
                     if len(split) == 2:
                         if split[0] == 'Surface':
                             stadiumInfo['stadium'] = stadiumItems[index-1].text.strip()
-                        stadiumInfo[cleanKey(split[0].strip())] = convertToInt(split[1].strip())
+                        stadiumInfo[cleanKey(split[0].strip())] = convertToNumber(split[1].strip())
 
                 #find nfl_schedule, update gameTime, hoepfully result as id, insert id into both info dicts, append to _list
-                nfl_schedule_query = {'year': year, 'week': week, 'homeTeam': homeTeam, 'awayTeam': awayTeam}
-                nfl_schedule_doc = col_nfl_schedule.find(nfl_schedule_query)
-                if nfl_schedule_doc.count() != 1:
-                    error_docs = str(nfl_schedule_query) + ' | ' + str(weatherInfo) + ' | ' + str(stadiumInfo)
+                schedule_query = {'year': year, 'week': week, 'homeTeam': homeTeam, 'awayTeam': awayTeam}
+                schedule_doc = col_schedule.find(schedule_query)
+                if schedule_doc.count() != 1:
+                    error_docs = str(schedule_query) + ' | ' + str(weatherInfo) + ' | ' + str(stadiumInfo)
                     raise Exception("nfl_scedule doc not found " + error_docs)
-                result = col_nfl_schedule.update_one(nfl_schedule_query, {'$set': {'dateTime': gameTime}})
-                nfl_schedule_id = nfl_schedule_doc[0]['_id']
-                weatherInfo['nfl_schedule_id'] = nfl_schedule_id
-                stadiumInfo['nfl_schedule_id'] = nfl_schedule_id
+                result = col_schedule.update_one(schedule_query, {'$set': {'dateTime': gameTime}})
+                schedule_id = schedule_doc[0]['_id']
+                weatherInfo['schedule_id'] = schedule_id
+                stadiumInfo['schedule_id'] = schedule_id
                 weather_list.append(weatherInfo)
                 stadium_list.append(stadiumInfo)
         except:

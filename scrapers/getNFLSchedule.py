@@ -15,14 +15,14 @@ from multiprocessing import Pool
 from robobrowserWrapper import open_or_follow_link, get_proxy_count, get_user_agent
 sys.path.append('../')
 from logWrapper import makeLogger, closeLogger
-from utilities import convertToInt
+from utilities import convertToNumber, cleanKey
 
 def parseYear(year):
     """
     parses a schedule for a specific year on http://www.pro-football-reference.com/years/{YEAR}/games.htm
     follows all the "boxscore" links (column[3]) to get stadium and weather conditions (game_info)
-    stores schedule info in fantasy.nfl_schedule
-    stores game_info in fantasy.game_info with nfl_schedule ids
+    stores schedule info in nfl_data.schedule
+    stores game_info in nfl_data.game_info with schedule ids
     """
     logger = makeLogger(year, r'./logs_nflSchedule/')
 
@@ -34,12 +34,12 @@ def parseYear(year):
     gameInfo_list = []
 
     client = MongoClient('localhost', 27017)
-    db = client['fantasy']
-    col_nfl_schedule = db['nfl_schedule']
+    db = client['nfl_data']
+    col_schedule = db['schedule']
     col_game_info = db['game_info']
     col_failed_game_info = db['failed_game_info']
 
-    if col_nfl_schedule.find({'year': year}).count():
+    if col_schedule.find({'year': year}).count():
         logger.debug('Already parsed %s', year)
         closeLogger(logger)
         return None
@@ -60,23 +60,23 @@ def parseYear(year):
             gameInfo_dict = {}
             columns = row.find_all('td')
             if columns:
-                schedule_dict['week'] = convertToInt(columns[0].text)
+                schedule_dict['week'] = convertToNumber(columns[0].text)
                 schedule_dict['day'] = columns[1].text
                 schedule_dict['date'] = columns[2].text
-                schedule_dict['year'] = convertToInt(year)
+                schedule_dict['year'] = convertToNumber(year)
                 homeIndicator = columns[5].text
                 if homeIndicator == '@':
                     schedule_dict['homeTeam'] = columns[6].text
                     schedule_dict['awayTeam'] = columns[4].text
-                    schedule_dict['homeTeamScore'] = convertToInt(columns[8].text)
-                    schedule_dict['awayTeamScore'] = convertToInt(columns[7].text)
+                    schedule_dict['homeTeamScore'] = convertToNumber(columns[8].text)
+                    schedule_dict['awayTeamScore'] = convertToNumber(columns[7].text)
                 else:
                     schedule_dict['homeTeam'] = columns[4].text
                     schedule_dict['awayTeam'] = columns[6].text
-                    schedule_dict['homeTeamScore'] = convertToInt(columns[7].text)
-                    schedule_dict['awayTeamScore'] = convertToInt(columns[8].text)
-                gameInfo_dict['week'] = convertToInt(columns[0].text)
-                gameInfo_dict['year'] = convertToInt(year)
+                    schedule_dict['homeTeamScore'] = convertToNumber(columns[7].text)
+                    schedule_dict['awayTeamScore'] = convertToNumber(columns[8].text)
+                gameInfo_dict['week'] = convertToNumber(columns[0].text)
+                gameInfo_dict['year'] = convertToNumber(year)
                 wait = random.uniform(.5, 2.5)
                 logger.debug('Waiting to follow_link %f', wait)
                 time.sleep(wait)
@@ -93,8 +93,8 @@ def parseYear(year):
                             if pair:
                                 failed_game_info = False
                                 key = pair[0].text
-                                value = convertToInt(pair[1].text)
-                                gameInfo_dict[key] = value
+                                value = convertToNumber(pair[1].text)
+                                gameInfo_dict[cleanKey(key)] = convertToNumber(value)
                     if failed_game_info:
                         failed_dict = schedule_dict
                         failed_dict['row'] = index
@@ -109,7 +109,7 @@ def parseYear(year):
 
     logger.debug('nfl_schedule.inert_many')
 
-    schedule_ids = col_nfl_schedule.insert_many(schedule_list).inserted_ids
+    schedule_ids = col_schedule.insert_many(schedule_list).inserted_ids
     
     logger.debug('mapping nfl_schedule.id to gameInfo_list')
 

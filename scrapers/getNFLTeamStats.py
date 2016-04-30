@@ -16,8 +16,8 @@ from logWrapper import makeLogger, closeLogger
 from utilities import convertToNumber, cleanKey
 
 client = MongoClient('localhost', 27017)
-db = client['fantasy']
-col_nfl_team_stats = db['nfl_team_stats']
+db = client['nfl_data']
+col_team_stats = db['team_stats']
 
 def removeNewLine(value):
     return re.sub('[\t,\n,\r]', '', value)
@@ -27,7 +27,7 @@ def parseSeason(role, category, season, seasonTypes):
     doesnt follow any links
     some years dont have any info, but still return a page.
     These are loged with Exception('No teams found %s' % url)
-    All data is stored in nfl_team_stats
+    All data is stored in team_stats
     """
     logger = makeLogger(role.text + '_' + category.text + '_' + season.text, r'./logs_nflteamStat/')
 
@@ -46,7 +46,7 @@ def parseSeason(role, category, season, seasonTypes):
             'category': removeNewLine(category.text)
         }
 
-        if col_nfl_team_stats.find(team_stats_query).count():
+        if col_team_stats.find(team_stats_query).count():
             logger.debug('Already parsed %s', team_stats_query)
             continue
 
@@ -116,7 +116,7 @@ def parseSeason(role, category, season, seasonTypes):
 
                 if tableColumn == 1:
                     teamStatDict['team'] = removeNewLine(tableItem.text)
-                    teamStatDict['year'] = convertToNumber(removeNewLine(season.text))
+                    teamStatDict['year'] = int(removeNewLine(season.text))
                     teamStatDict['seasonType'] = removeNewLine(seasonType.text)
                     teamStatDict['role'] = removeNewLine(role.text)
                     teamStatDict['category'] = removeNewLine(category.text)
@@ -142,7 +142,7 @@ def parseSeason(role, category, season, seasonTypes):
     try:
         if teamStat_list:
             logger.debug('Bulk Creating teamStat_list')
-            col_nfl_team_stats.insert_many(teamStat_list)
+            col_team_stats.insert_many(teamStat_list)
     except:
         logger.exception('insert_many error')
 

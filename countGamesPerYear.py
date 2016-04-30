@@ -3,23 +3,23 @@ from pymongo import MongoClient
 from collections import Counter
 
 client = MongoClient('localhost', 27017)
-db = client['fantasy']
-col_nfl_schedule = db['nfl_schedule']
+db = client['nfl_data']
+col_schedule = db['schedule']
 col_game_info = db['game_info']
 col_failed_game_info = db['failed_game_info']
 col_weather_info = db['weather_info']
 col_stadium_info = db['stadium_info']
-col_nfl_team_stats = db['nfl_team_stats']
+col_team_stats = db['team_stats']
 col_fanduel_prices = db['fanduel_prices']
 
 weatherCounter = Counter()
 for each in col_weather_info.find():
-    year = col_nfl_schedule.find({'_id': each['nfl_schedule_id']})[0]['year']
+    year = col_schedule.find({'_id': each['schedule_id']})[0]['year']
     weatherCounter[year] += 1
 
 stadiumCounter = Counter()
 for each in col_weather_info.find():
-    year = col_nfl_schedule.find({'_id': each['nfl_schedule_id']})[0]['year']
+    year = col_schedule.find({'_id': each['schedule_id']})[0]['year']
     stadiumCounter[year] += 1
 
 minyear = 1960
@@ -28,7 +28,7 @@ maxyear = 2015
 gameCountDict = {}
 for i in range(maxyear-minyear+1):
     year = minyear + i
-    gameCount = col_nfl_schedule.find({'year': year}).count()
+    gameCount = col_schedule.find({'year': year}).count()
     print '-'*30
     print 'year:', year
     print 'gameCount:', gameCount
@@ -36,7 +36,7 @@ for i in range(maxyear-minyear+1):
     print 'stadiumCount:', stadiumCounter.get(year)
 
 previous_year = None
-for each in col_nfl_team_stats.aggregate([
+for each in col_team_stats.aggregate([
         { "$group":{ '_id':{'year': '$year', 'role': '$role', 'category': '$category'}, 'count': {"$sum": 1}}},
         {'$sort':{'_id.year':1, '_id.role':-1}},
 
