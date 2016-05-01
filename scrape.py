@@ -16,14 +16,14 @@ import getRotoFDStats
 def run(scriptName, *args):
     cmd = 'python ' + scriptName
     for arg in args:
-        cmd += ' ' + arg
+        cmd += ' ' + str(arg)
 
     Popen(cmd, cwd=r'./scrapers').wait()
 
 def main():
     """
-    Starts all of the scrappers.
-    It conditionally starts certain scrappers either for a mongo requirement, 
+    Starts all of the scrapers.
+    It conditionally starts certain scrapers either for a mongo requirement, 
     or to prevent parsing the same site with two differtent parses at the same time.
     Optional argument, wait, can be past to .run to sleep n seconds before starting
     First starts getPFRSchedule, getNFLTeamStats, and getRotoFDStats

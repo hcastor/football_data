@@ -158,5 +158,5 @@ def run(wait):
 if __name__ == '__main__':
     wait = 0
     if len(sys.argv) == 2:
-        wait = sys.argv[1]
+        wait = int(sys.argv[1])
     run(wait)

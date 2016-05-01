@@ -132,8 +132,8 @@ def run(wait):
 
     pool = Pool(processes=int(get_proxy_count()/2.5))
 
-    #nflweather.com goes back to 2009, 2010 seems to be missing.
-    pages = [(2009, 17), (2010, 17), (2011, 17), (2012, 17), (2013, 17), (2014, 17), (2015, 17)]
+    #nflweather.com goes back to 2009, 2010 seems to be missing on the site.
+    pages = [(2009, 17), (2011, 17), (2012, 17), (2013, 17), (2014, 17), (2015, 17)]
 
     headers = []
     dataList = []
@@ -152,5 +152,5 @@ def run(wait):
 if __name__ == '__main__':
     wait = 0
     if len(sys.argv) == 2:
-        wait = sys.argv[1]
+        wait = int(sys.argv[1])
     run(wait)
