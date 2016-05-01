@@ -117,10 +117,18 @@ def parseWeek(year, week):
 
     closeLogger(str(year) + '_' + str(week))
 
-def main():
+def run(wait):
+    """Starts the scrapping proccess.
+    creates a process for each week per year given in pages
+    """
 
+    logger = makeLogger('main', r'./logs_nflWeather/')
+    
     startTime = datetime.now()
-    print startTime
+    
+    logger.debug('start time: ' + str(startTime))
+    logger.debug('waiting %d seconds', wait)
+    time.sleep(wait)
 
     pool = Pool(processes=int(get_proxy_count()/2.5))
 
@@ -137,7 +145,6 @@ def main():
     pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
     pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
 
-    print datetime.now()-startTime 
+    logger.debug('run time: ' + str(datetime.now()-startTime ))
 
-if __name__ == '__main__':
-    main()
+    closeLogger('main')

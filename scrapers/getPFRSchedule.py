@@ -24,7 +24,7 @@ def parseYear(year):
     stores schedule info in nfl_data.schedule
     stores game_info in nfl_data.game_info with schedule ids
     """
-    logger = makeLogger(year, r'./logs_nflSchedule/')
+    logger = makeLogger(year, r'./logs_pfrSchedule/')
 
     startTime = datetime.now()
 
@@ -125,10 +125,18 @@ def parseYear(year):
 
     closeLogger(year)
 
-def main():
+def run(wait):
+    """Starts the scrapping proccess.
+    creates a process per year between minyear and maxyear
+    """
+
+    logger = makeLogger('main', r'./logs_pfrSchedule/')
 
     startTime = datetime.now()
-    print startTime
+    
+    logger.debug('start time: ' + str(startTime))
+    logger.debug('waiting %d seconds', wait)
+    time.sleep(wait)
 
     minyear = 1960
     maxyear = 2015
@@ -143,7 +151,6 @@ def main():
     pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
     pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
 
-    print datetime.now()-startTime 
+    logger.debug('run time: ' + str(datetime.now()-startTime ))
 
-if __name__ == '__main__':
-    main()
+    closeLogger('main')

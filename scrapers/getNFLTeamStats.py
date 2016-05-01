@@ -150,7 +150,7 @@ def parseSeason(role, category, season, seasonTypes):
 
     closeLogger(role.text + '_' + category.text)
 
-def main():
+def run(wait):
     """Starts the scrapping proccess.
     Opens a teamstats page and gathers all the form inputs
     Then sends these inputs to parseSeason which opens a new page for every possible option in the form
@@ -160,7 +160,10 @@ def main():
     logger = makeLogger('main', r'./logs_nflteamStat/')
 
     startTime = datetime.now()
-    logger.debug('Starting')
+    
+    logger.debug('start time: ' + str(startTime))
+    logger.debug('waiting %d seconds', wait)
+    time.sleep(wait)
 
     pool = Pool(processes=int(get_proxy_count()/2.5))
 
@@ -203,8 +206,6 @@ def main():
     pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
     pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
 
-    print datetime.now()-startTime
-    logger.debug('main time elapsed: ' + str(datetime.now() - startTime))
+    logger.debug('run time: ' + str(datetime.now()-startTime ))
 
-if __name__ == '__main__':
-    main()
+    closeLogger('main')

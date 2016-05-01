@@ -635,17 +635,20 @@ def parsePlayer(playerUrl):
 
     closeLogger(playerId)
 
-def main():
+def run(wait):
     """
     First collects a set of playerUrls to parse using, parsePlayerNames.
     Then parses each player.
     Both tasks use multiprocessing
     """
 
-    startTime = datetime.now()
-    print startTime
-
     logger = makeLogger('main', r'./logs_nflPlayerStats/')
+
+    startTime = datetime.now()
+    
+    logger.debug('start time: ' + str(startTime))
+    logger.debug('waiting %d seconds', wait)
+    time.sleep(wait)
     
     pool = Pool(processes=int(get_proxy_count()/2.5))
     results = []
@@ -693,8 +696,6 @@ def main():
     pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
 
         
-    logger.debug('main time elapsed: ' + str(datetime.now() - startTime))
-    print datetime.now()-startTime 
+    logger.debug('run time: ' + str(datetime.now()-startTime ))
 
-if __name__ == '__main__':
-    main()
+    closeLogger('main')
