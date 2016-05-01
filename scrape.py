@@ -1,7 +1,9 @@
 #Date created 4/30/16
 import sys
+import time
 from datetime import datetime
 from multiprocessing import Pool
+from subprocess import Popen
 
 from logWrapper import makeLogger, closeLogger
 sys.path.append('./scrapers')
@@ -10,6 +12,13 @@ import getPFRSchedule
 import getNFLTeamStats
 import getNFLWeather
 import getRotoFDStats
+
+def run(scriptName, *args):
+    cmd = 'python ' + scriptName
+    for arg in args:
+        cmd += ' ' + arg
+
+    Popen(cmd, cwd=r'./scrapers').wait()
 
 def main():
     """
@@ -27,23 +36,24 @@ def main():
 
     pool = Pool(processes=5)
 
-    pfrSchedule = pool.apply_async(getPFRSchedule.run, ())
-    nflTeamStats = pool.apply_async(getNFLTeamStats.run, ())
-    rotoFDStats = pool.apply_async(getRotoFDStats.run, ())
+    pfrSchedule = pool.apply_async(run, ('getPFRSchedule.py',))
+    nflTeamStats = pool.apply_async(run, ('getNFLTeamStats.py',))
+    rotoFDStats = pool.apply_async(run, ('getRotoFDStats.py',))
 
     nflWeather_started = False
     nflPlayerStats_started = False
     while not nflWeather_started or not nflPlayerStats_started:
+        time.sleep(1)
         if not nflWeather_started and pfrSchedule.ready():
             if pfrSchedule.successful():
-                nflWeather = pool.apply_async(getNFLWeather.run, ())
+                nflWeather = pool.apply_async(run, ('getNFLWeather.py',))
             else:
                 print 'pfrSchedule not successful, skipping nflWeather'
             nflWeather_started = True
 
         if not nflPlayerStats_started and nflTeamStats.ready():
             if nflTeamStats.successful():
-                nflPlayerStats = pool.apply_async(getNFLPlayerStats.run, (5400,))
+                nflPlayerStats = pool.apply_async(run, ('getNFLPlayerStats.py', 5400,))
             else:
                 print 'nflTeamStats not successful, skipping nflPlayerStats'
             nflPlayerStats_started = True

@@ -38,7 +38,7 @@ def parseWeek(year, week):
     time.sleep(wait)
 
     logger.debug('Opening main page')
-    browser = RoboBrowser(history=False, user_agent=get_user_agent(logger), timeout=10)
+    browser = RoboBrowser(history=False, parser='html.parser', user_agent=get_user_agent(logger), timeout=10)
     url = "http://rotoguru1.com/cgi-bin/fyday.pl?week={}&year={}&game=fd&scsv=1".format(week, year)
     browser = open_or_follow_link(logger, browser, 'open', url)
 
@@ -99,3 +99,9 @@ def run(wait=0):
     logger.debug('run time: ' + str(datetime.now()-startTime ))
 
     closeLogger('main')
+
+if __name__ == '__main__':
+    wait = 0
+    if len(sys.argv) == 2:
+        wait = sys.argv[1]
+    run(wait)

@@ -209,3 +209,9 @@ def run(wait):
     logger.debug('run time: ' + str(datetime.now()-startTime ))
 
     closeLogger('main')
+
+if __name__ == '__main__':
+    wait = 0
+    if len(sys.argv) == 2:
+        wait = sys.argv[1]
+    run(wait)
