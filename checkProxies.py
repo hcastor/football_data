@@ -1,9 +1,9 @@
 #Date created 2/27/16
-import csv
+import json
 from robobrowser import RoboBrowser
 from multiprocessing import Pool
 
-def testProxy(row):
+def testProxy(proxy):
     """
     Tests a proxy with api.ipify.org
     If the proxy fails, it retries 20 more times.
@@ -14,7 +14,7 @@ def testProxy(row):
     while(True):
         try:
             tries += 1
-            browser.open("http://api.ipify.org", proxies={'http': 'http://' + row['IP Address'] + ':' + row['Port']})
+            browser.open("http://api.ipify.org", proxies={'http': proxy})
             if browser.find('body').text != row['IP Address']:
                 raise Exception('Failed')
             return row
@@ -31,12 +31,12 @@ def main():
     pool = Pool(processes=200)
 
     results = []
-    with open('proxy_list_http.csv', 'rb') as csvfile:
-        reader = csv.DictReader(csvfile)
+    with open('proxy_list_http.json', 'rb') as jsonData:
+        proxies = json.load(jsonData)
         
-        for row in reader:
+        for proxy in proxies:
             #print testProxy(row)
-            results.append(pool.apply_async(testProxy, (row,)))
+            results.append(pool.apply_async(testProxy, (proxy,)))
     
     pool.close() #Prevents any more tasks from being submitted to the pool. Once all the tasks have been completed the worker processes will exit.
     pool.join() #Wait for the worker processes to exit. One must call close() or terminate() before using join().
@@ -45,21 +45,19 @@ def main():
     duplicates = 0
     failed = 0
     success = 0
-    with open('proxy_list_http.csv', 'wb') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=['Last Update','IP Address','Port','Country','Speed','Connection Time','Type','Anon'])
-        writer.writeheader()
+    with open('proxy_list_http.json', 'wb') as jsonFile:
         for result in results:
-            value = result.get()
-            if value:
+            proxy = result.get()
+            if proxy:
                 success += 1
-                proxy = value['IP Address'] + ' ' + value['Port']
                 if proxy not in proxySet:
-                    writer.writerow(value)
                     proxySet.add(proxy)
                 else:
                     duplicates += 1
             else:
                 failed += 1
+
+        jsonFile.write(json.dumps(list(proxySet)))
 
     print 'success:', success
     print 'failed:', failed
