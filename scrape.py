@@ -14,6 +14,11 @@ import getNFLWeather
 import getRotoFDStats
 
 def run(scriptName, *args):
+    """
+    Runs "python scriptName args"
+    Waits for script to finish before returning
+    Used to schedule scrapers, that depend on each other
+    """
     cmd = 'python ' + scriptName
     for arg in args:
         cmd += ' ' + str(arg)

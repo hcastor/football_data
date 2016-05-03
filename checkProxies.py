@@ -4,6 +4,11 @@ from robobrowser import RoboBrowser
 from multiprocessing import Pool
 
 def testProxy(row):
+    """
+    Tests a proxy with api.ipify.org
+    If the proxy fails, it retries 20 more times.
+    This is because free proxies are unreliable at times.
+    """
     tries = 0
     browser = RoboBrowser(history=False,  parser='html5lib', timeout=10)
     while(True):
@@ -18,8 +23,12 @@ def testProxy(row):
                 return None
 
 def main():
+    """
+    Used to get rid of any proxies that dont work anymore.
+    Uses multiprocess to test 200 proxies at a time
+    Overwrites proxy_list_http.csv with only working proxies
+    """
     pool = Pool(processes=200)
-
 
     results = []
     with open('proxy_list_http.csv', 'rb') as csvfile:

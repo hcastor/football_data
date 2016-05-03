@@ -4,6 +4,11 @@ import logging
 from datetime import datetime
 
 def makeLogger(loggerName, logDir):
+    """
+    Used to get or create a logger object
+    Wraps logging.getLogger to consistently set log settings
+    and create logDir if the path doesnt exist
+    """
     if not os.path.isdir(logDir):
         os.mkdir(logDir)
 
@@ -27,6 +32,9 @@ def makeLogger(loggerName, logDir):
     return logger
 
 def closeLogger(loggerName):
+    """
+    Uses a while loop to close a logs handles because of a bug with removeHandler
+    """
     loggerName = str(loggerName)
     logger = logging.getLogger(loggerName)
     handlers = logger.handlers[:]
