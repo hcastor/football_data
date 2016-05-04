@@ -1,15 +1,19 @@
 # football_data
+Parses several websites, to collect data in mongo to be used for machine learning.
+
+To parse these sites in a reasonable amount of time, multiprocessing is used to break up each individual page to parse lots of pages at once. A random proxy, and user agent is used for each request. The number of processes running is NUMBER_OF_PROXIES/2.5. A random time is waited, usually 2-4 seconds, before each request is made to prevent hitting their servers to hard.
 
 ## Mongo collections
-
+Structure of the collections
 ![Alt Text](https://github.com/hcastor/football_data/blob/master/mongo_collections.png)
 
 ## Mongo collection stats
 Shows key occurence rate, and value types for each collection.
+Useful to determine how stats are available.
 Produced with https://github.com/variety/variety
 
 ###### schedule
-
+Parsed from http://www.pro-football-reference.com/years/{year}/games.htm
 ```
 +---------------------------------------------------------------------------------+
 | key           | types                       | occurrences | percents            |
@@ -26,53 +30,8 @@ Produced with https://github.com/variety/variety
 | dateTime      | String                      |        1535 |  12.781015820149875 |
 +---------------------------------------------------------------------------------+
 ```
-
-###### stadium_info
-
-```
-+-------------------------------------------------------------------+
-| key         | types                      | occurrences | percents |
-| ----------- | -------------------------- | ----------- | -------- |
-| _id         | ObjectId                   |        1535 |    100.0 |
-| capacity    | Number                     |        1535 |    100.0 |
-| location    | String                     |        1535 |    100.0 |
-| schedule_id | ObjectId                   |        1535 |    100.0 |
-| stadium     | String                     |        1535 |    100.0 |
-| surface     | String                     |        1535 |    100.0 |
-| type        | String                     |        1535 |    100.0 |
-| week        | Number                     |        1535 |    100.0 |
-| year        | Number                     |        1535 |    100.0 |
-| zip         | Number (1363),String (172) |        1535 |    100.0 |
-+-------------------------------------------------------------------+
-```
-
-###### weather_info
-
-```
-+-------------------------------------------------------------------+
-| key                | types    | occurrences | percents            |
-| ------------------ | -------- | ----------- | ------------------- |
-| _id                | ObjectId |        1535 | 100.000000000000000 |
-| schedule_id        | ObjectId |        1535 | 100.000000000000000 |
-| shortWind          | String   |        1535 | 100.000000000000000 |
-| weatherPicAlt      | String   |        1535 | 100.000000000000000 |
-| weatherText        | String   |        1535 | 100.000000000000000 |
-| week               | Number   |        1535 | 100.000000000000000 |
-| year               | Number   |        1535 | 100.000000000000000 |
-| temperature        | String   |        1534 |  99.934853420195438 |
-| humidity           | String   |        1526 |  99.413680781758956 |
-| dew_point          | String   |        1523 |  99.218241042345284 |
-| visibility         | String   |        1507 |  98.175895765472319 |
-| barometer          | String   |        1503 |  97.915309446254071 |
-| wind               | String   |        1017 |  66.254071661237788 |
-| feels_like         | String   |         325 |  21.172638436482085 |
-| cloud_cover        | String   |         320 |  20.846905537459282 |
-| precipitation_prob | String   |         320 |  20.846905537459282 |
-+-------------------------------------------------------------------+
-```
-
 ###### game_info
-
+Parsed from http://www.pro-football-reference.com/{game info} off of each link on http://www.pro-football-reference.com/years/{year}/games.htm
 ```
 +------------------------------------------------------------------------------------+
 | key             | types                       | occurrences | percents             |
@@ -95,9 +54,51 @@ Produced with https://github.com/variety/variety
 | super_bowl_mvp  | String                      |          50 |   0.4163197335553705 |
 +------------------------------------------------------------------------------------+
 ```
-
+###### weather_info
+Parsed from http://nflweather.com/week/{}/Week-{}
+```
++-------------------------------------------------------------------+
+| key                | types    | occurrences | percents            |
+| ------------------ | -------- | ----------- | ------------------- |
+| _id                | ObjectId |        1535 | 100.000000000000000 |
+| schedule_id        | ObjectId |        1535 | 100.000000000000000 |
+| shortWind          | String   |        1535 | 100.000000000000000 |
+| weatherPicAlt      | String   |        1535 | 100.000000000000000 |
+| weatherText        | String   |        1535 | 100.000000000000000 |
+| week               | Number   |        1535 | 100.000000000000000 |
+| year               | Number   |        1535 | 100.000000000000000 |
+| temperature        | String   |        1534 |  99.934853420195438 |
+| humidity           | String   |        1526 |  99.413680781758956 |
+| dew_point          | String   |        1523 |  99.218241042345284 |
+| visibility         | String   |        1507 |  98.175895765472319 |
+| barometer          | String   |        1503 |  97.915309446254071 |
+| wind               | String   |        1017 |  66.254071661237788 |
+| feels_like         | String   |         325 |  21.172638436482085 |
+| cloud_cover        | String   |         320 |  20.846905537459282 |
+| precipitation_prob | String   |         320 |  20.846905537459282 |
++-------------------------------------------------------------------+
+```
+###### stadium_info
+Parsed from http://nflweather.com/week/{}/Week-{} off of each more details links
+```
++-------------------------------------------------------------------+
+| key         | types                      | occurrences | percents |
+| ----------- | -------------------------- | ----------- | -------- |
+| _id         | ObjectId                   |        1535 |    100.0 |
+| capacity    | Number                     |        1535 |    100.0 |
+| location    | String                     |        1535 |    100.0 |
+| schedule_id | ObjectId                   |        1535 |    100.0 |
+| stadium     | String                     |        1535 |    100.0 |
+| surface     | String                     |        1535 |    100.0 |
+| type        | String                     |        1535 |    100.0 |
+| week        | Number                     |        1535 |    100.0 |
+| year        | Number                     |        1535 |    100.0 |
+| zip         | Number (1363),String (172) |        1535 |    100.0 |
++-------------------------------------------------------------------+
+```
 ###### team_stats
-
+Parsed from http://www.nfl.com/stats/categorystats?tabSeq=2&offensiveStatisticCategory=GAME_STATS&conference=ALL&role=TM&season=2015&seasonType=REG
+parses each possilbe drop down combination
 ```
 +----------------------------------------------------------------------------------------+
 | key                | types                        | occurrences | percents             |
@@ -244,9 +245,9 @@ Produced with https://github.com/variety/variety
 | sacks              | Number                       |         308 |   0.6528328281650735 |
 +----------------------------------------------------------------------------------------+
 ```
-
 ###### player_profiles
-
+Player profile links are parsed from here http://www.nfl.com/stats/categorystats?tabSeq=0&statisticCategory=PASSING&qualified=true&season=2015&seasonType=PRE
+And there profils parsed from the found link
 ```
 +-------------------------------------------------------------+
 | key           | types    | occurrences | percents           |
@@ -267,9 +268,8 @@ Produced with https://github.com/variety/variety
 | Age           | String   |        1763 |  99.88668555240793 |
 +-------------------------------------------------------------+
 ```
-
 ###### player_combines
-
+Parsed from the player profile link
 ```
 +------------------------------------------------------------------+
 | key               | types    | occurrences | percents            |
@@ -286,9 +286,8 @@ Produced with https://github.com/variety/variety
 | 60 Yard Shuttle   | String   |         218 |  26.360338573155985 |
 +------------------------------------------------------------------+
 ```
-
 ###### player_drafts
-
+Parsed from the player profile link
 ```
 +-------------------------------------------------------+
 | key               | types    | occurrences | percents |
@@ -302,9 +301,8 @@ Produced with https://github.com/variety/variety
 | team              | String   |         805 |    100.0 |
 +-------------------------------------------------------+
 ```
-
 ###### player_career_stats
-
+Parsed from the player profile link
 ```
 +---------------------------------------------------------------------------------------+
 | key               | types                        | occurrences | percents             |
@@ -366,9 +364,8 @@ Produced with https://github.com/variety/variety
 | xpm               | Number (299),String (51)     |         350 |   1.7835303709743171 |
 +---------------------------------------------------------------------------------------+
 ```
-
 ###### player_game_logs
-
+Parsed from the player profile link
 ```
 +-----------------------------------------------------------------------------------------+
 | key                | types                         | occurrences | percents             |
@@ -447,9 +444,8 @@ Produced with https://github.com/variety/variety
 | punter_yds         | Number (4387),String (116)    |        4503 |   3.5540086186484823 |
 +-----------------------------------------------------------------------------------------+
 ```
-
 ###### player_splits
-
+Parsed from the player profile link
 ```
 +------------------------------------------------------------------------------------------+
 | key               | types                           | occurrences | percents             |
@@ -495,9 +491,8 @@ Produced with https://github.com/variety/variety
 | rety              | Number                          |       13869 |   2.5321933077357053 |
 +------------------------------------------------------------------------------------------+
 ```
-
 ###### fanduel_prices
-
+Parsed from http://rotoguru1.com/cgi-bin/fyday.pl?week={}&year={}&game=fd&scsv=1
 ```
 +-----------------------------------------------------------------+
 | key       | types                      | occurrences | percents |
