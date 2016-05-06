@@ -1,5 +1,9 @@
 # football_data
-Parses several websites, to collect data in mongo to be used for machine learning.
+Parses these websites, to collect data in mongo to be used for machine learning:
+http://www.nfl.com
+http://nflweather.com
+http://rotoguru1.com
+http://pro-football-reference.com
 
 To parse these sites in a reasonable amount of time, multiprocessing is used to break up each individual page to parse lots of pages at once. A random proxy, and user agent is used for each request. The number of processes running is NUMBER_OF_PROXIES/2.5. A random time is waited, usually 2-4 seconds, before each request is made to prevent hitting their servers to hard.
 
@@ -55,7 +59,7 @@ Parsed from http://www.pro-football-reference.com/{game info} off of each link o
 +------------------------------------------------------------------------------------+
 ```
 ###### weather_info
-Parsed from http://nflweather.com/week/{}/Week-{}
+Parsed from x/week/{}/Week-{}
 ```
 +-------------------------------------------------------------------+
 | key                | types    | occurrences | percents            |
