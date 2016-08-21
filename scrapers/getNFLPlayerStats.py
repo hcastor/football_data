@@ -448,7 +448,7 @@ def parsePlayerNames(statisticCategory, season, seasonType):
         tries = 0
         # sometimes when using slow proxies nfl.com returns 200 without the whole page being loaded
         while not result:
-            if tries > 10:
+            if tries > 3:
                 raise Exception('No teams found %s' % url)
             elif tries > 0:
                 time.sleep(random.uniform(5, 7))
@@ -669,7 +669,7 @@ def run(wait):
         if statisticCategory.text == 'Category...':
             continue
         for season in seasons:
-            if season.text == 'Season...' or int(season.text) != 2015:
+            if season.text == 'Season...':
                 continue
             for seasonType in seasonTypes:
                 if seasonType.text == 'Season Type...':
@@ -681,14 +681,23 @@ def run(wait):
 
     playerUrl_set = set()
     for result in results:
-        result_set = result.get()
-        if result_set:
-            playerUrl_set = playerUrl_set.union(result_set)
+        try:
+            result_set = result.get()
+            if result_set:
+                playerUrl_set = playerUrl_set.union(result_set)
+        except:
+            logger.exception('Error in parsePlayerNames worker')
+
+    with open('../playerUrl_set.json', 'w') as playerUrl_json:
+        playerUrl_json.write(json.dumps(list(playerUrl_set)))
 
     pool = Pool(processes=int(get_proxy_count()/2.5))
 
     logger.debug('Starting to parse %d players', len(playerUrl_set))
     for playerUrl in playerUrl_set:
+        if col_player_profiles.find({'player_url': playerUrl}).count():
+            logger.debug('Skipping ' + playerUrl)
+            continue
         #parsePlayer(playerUrl)
         pool.apply_async(parsePlayer, (playerUrl,))
 
